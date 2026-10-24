@@ -29,6 +29,7 @@
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html, body { height: 100%; }
+body { margin: 0; }
 body {
   background: var(--ink);
   color: var(--cream);
@@ -84,11 +85,29 @@ canvas {
 .hint { font-size: 13px; opacity: .75; text-align: center; min-width: 0; }
 .rotate { display: none; font-size: 13px; color: var(--sun); text-align: center; }
 @media (orientation: portrait) and (pointer: coarse) { .rotate { display: block; } .hint { display: none; } }
-@media (max-height: 520px) {
-  .btn { height: 48px; font-size: 17px; }
-  .hint, .rotate { display: none; }
-  .tog { padding: 4px 11px; font-size: 13px; }
-  .row2 { width: auto; flex: 1 1 auto; }
+/* upright: LOOP and FIRE side by side, then the toggles, then the hint */
+.side, .pills { display: contents; }
+.btn.loop { order: 1; }
+.btn.fire { order: 2; }
+.brk { order: 3; flex: 0 0 100%; height: 0; }
+.controls .tog { order: 4; }
+.hint, .rotate { order: 5; flex: 0 0 100%; }
+#stage { min-width: 0; }
+/* sideways on a phone: LOOP on the left, FIRE on the right, playfield fills the middle */
+@media (orientation: landscape) and (max-height: 640px) {
+  body { padding-block: 8px; }
+  .app { flex-direction: row; gap: 8px; }
+  .controls { display: contents; }
+  .side { display: flex; flex-direction: column; gap: 8px; flex: 0 0 auto; width: clamp(92px, 12vw, 130px); min-height: 0; }
+  .side.sl { order: 0; }
+  #stage { order: 1; }
+  .side.sr { order: 2; }
+  .pills { display: flex; flex-direction: column; gap: 6px; }
+  .side .btn { order: 0; flex: 1 1 0; height: auto; min-height: 56px; font-size: 18px; }
+  .side { overflow: hidden; }
+  .brk, .hint, .rotate { display: none; }
+  .controls .tog { order: 0; padding: 4px 6px; font-size: 12px; line-height: 1.2; text-align: center; flex: 0 0 auto; }
+  .pills { gap: 5px; }
 }
 
 /* pause menu */
@@ -139,8 +158,6 @@ canvas {
 @media (prefers-reduced-motion: reduce) { .btn:active, .mbtn:active { transform: none; } }
 </style>
 
-</head>
-<body>
 <div class="app">
   <div id="stage">
     <canvas id="c" width="720" height="450" aria-label="Ace Wingfield game screen"></canvas>
@@ -181,17 +198,24 @@ canvas {
     </div>
   </div>
   <div class="controls">
-    <button class="btn loop" id="btnLoop" type="button">LOOP</button>
-    <button class="btn fire" id="btnFire" type="button">FIRE</button>
-    <div class="row2">
-      <button class="tog act" id="btnPause" type="button" hidden>Pause</button>
-      <button class="tog" id="togHow" type="button">How to play</button>
-      <button class="tog" id="togScores" type="button" hidden>High scores</button>
-      <button class="tog act" id="togSkip" type="button" hidden>Skip tutorial</button>
-      <button class="tog" id="togAuto" type="button" aria-pressed="false">Auto-fire</button>
-      <button class="tog" id="togMusic" type="button" aria-pressed="true">Music</button>
-      <button class="tog" id="togSound" type="button" aria-pressed="true">Sound</button>
+    <div class="side sl">
+      <button class="btn loop" id="btnLoop" type="button">LOOP</button>
+      <div class="pills">
+        <button class="tog act" id="btnPause" type="button" hidden>Pause</button>
+        <button class="tog act" id="togSkip" type="button" hidden>Skip tutorial</button>
+        <button class="tog" id="togAuto" type="button" aria-pressed="false">Auto-fire</button>
+      </div>
     </div>
+    <div class="side sr">
+      <button class="btn fire" id="btnFire" type="button">FIRE</button>
+      <div class="pills">
+        <button class="tog" id="togMusic" type="button" aria-pressed="true">Music</button>
+        <button class="tog" id="togSound" type="button" aria-pressed="true">Sound</button>
+        <button class="tog" id="togHow" type="button">How to play</button>
+        <button class="tog" id="togScores" type="button" hidden>High scores</button>
+      </div>
+    </div>
+    <span class="brk"></span>
     <div class="hint">Arrows or WASD to fly &middot; Space to fire &middot; Shift to loop (no hits mid-loop) &middot; P to pause</div>
     <div class="rotate">Turn your phone sideways for a bigger sky. Drag on the sky to fly.</div>
   </div>
@@ -212,7 +236,10 @@ canvas {
   function fit() {
     const bw = stage.clientWidth, bh = stage.clientHeight;
     if (bw < 10 || bh < 10) return;
-    W = Math.round(clamp(H * (bw / bh), 640, 840));
+    const aspect = bw / bh;
+    if (aspect >= 560 / 450 * 1.14) { H = 450; W = Math.round(clamp(H * aspect, 640, 840)); }
+    else if (aspect >= 0.9) { W = 560; H = Math.round(clamp(W / aspect, 450, 620)); }
+    else { W = 480; H = Math.round(clamp(W / aspect, 600, 800)); }
     const s = Math.min(bw / W, bh / H);
     const cssW = Math.floor(W * s), cssH = Math.floor(H * s);
     cv.style.width = cssW + 'px'; cv.style.height = cssH + 'px';
@@ -332,7 +359,7 @@ canvas {
   const P = { x: 120, y: 225, vx: 0, vy: 0, hp: 3, inv: 0, fire: 0, rapid: 0, spread: 0, shield: 0, loop: 0, loopCd: 0, ang: 0, dead: false, puff: 0, smoke: 0 };
   let bullets = [], eb = [], en = [], pk = [], pt = [], boss = null, spawnT = 1, nextBoss = 20, bossesDone = 0, deadT = 0, newBest = false;
   let warn = 0, bossPending = false, lastWarnK = -1, tut = null, flashW = 0;
-  let clouds = [];
+  let clouds = [], minesSeen = false;
   const LOOP_T = 0.7, LOOP_CD = 2.6;
   const level = () => 1 + Math.floor(kills / 8);
 
@@ -341,8 +368,10 @@ canvas {
     ace:    { hp: 2, w: 54, h: 28, sp: 150, score: 250, s: 1 },
     bomber: { hp: 5, w: 92, h: 46, sp: 55,  score: 500, s: 1.6 },
     diver:  { hp: 1, w: 46, h: 26, sp: 170, score: 150, s: 0.9 },
-    mine:   { hp: 1, w: 34, h: 34, sp: 50,  score: 75,  s: 1 }
+    mine:   { hp: 1, w: 34, h: 34, sp: 50,  score: 75,  s: 1 },
+    hmine:  { hp: 2, w: 40, h: 40, sp: 42,  score: 75,  s: 1 }
   };
+  const BLAST_R = 78;
   const PAL = {
     hero:   { body: '#2a9d8f', light: '#63c9ba', wing: '#f6ead0', dark: '#14323d', stripe: '#f2b632' },
     scout:  { body: '#6f8f3b', light: '#9dbb5c', wing: '#b4c878', dark: '#2c3a16', stripe: '#e8d36a' },
@@ -351,6 +380,30 @@ canvas {
     diver:  { body: '#d9482b', light: '#f07a52', wing: '#f1b9a0', dark: '#4a1a10', stripe: '#f6ead0' },
     baron:  { body: '#b3262b', light: '#e0575a', wing: '#e8c9a0', dark: '#2a0d10', stripe: '#14323d' }
   };
+  const SKINS = [
+    { name: 'Teal',      body: '#2a9d8f', light: '#63c9ba', wing: '#f6ead0', dark: '#14323d', stripe: '#f2b632' },
+    { name: 'Sunshine',  body: '#f2b632', light: '#ffd873', wing: '#fff3d0', dark: '#5a3d0a', stripe: '#14323d' },
+    { name: 'Sky Blue',  body: '#3b82c4', light: '#7fb5e8', wing: '#eaf3fb', dark: '#12304f', stripe: '#f6ead0' },
+    { name: 'Midnight',  body: '#2b3a67', light: '#5a6cb0', wing: '#c7cff0', dark: '#0d1430', stripe: '#f2b632' },
+    { name: 'Bubblegum', body: '#e86aa6', light: '#f5a3c8', wing: '#fde6f0', dark: '#5a1636', stripe: '#f6ead0' },
+    { name: 'Snow',      body: '#dfe8ee', light: '#ffffff', wing: '#cfe0ea', dark: '#14323d', stripe: '#e85d4a' },
+    { name: 'Cherry',    body: '#d63a52', light: '#f27a8c', wing: '#f6ead0', dark: '#4a0f1a', stripe: '#14323d' },
+    { name: 'Graphite',  body: '#4a5560', light: '#7d8a96', wing: '#d9dee2', dark: '#151a1f', stripe: '#f2b632' }
+  ];
+  let skin = 0;
+  try { const v = parseInt(localStorage.getItem('aw_skin'), 10); if (v >= 0 && v < SKINS.length) skin = v; } catch (e) {}
+  function setSkin(i) {
+    skin = (i + SKINS.length) % SKINS.length;
+    Object.assign(PAL.hero, SKINS[skin]);
+    try { localStorage.setItem('aw_skin', String(skin)); } catch (e) {}
+  }
+  setSkin(skin);
+  const swatchX = i => W / 2 + (i - (SKINS.length - 1) / 2) * 44, swatchY = () => H * 0.5 + 74;
+  function pickSkinAt(p) {
+    if (Math.abs(p.y - swatchY()) > 24) return false;
+    for (let i = 0; i < SKINS.length; i++) if (Math.abs(p.x - swatchX(i)) < 22) { setSkin(i); sfx('pick'); return true; }
+    return false;
+  }
   const BOSS_DEFS = [
     { name: 'THE GRAND GASBAG', hp: 30, rx: 100, ry: 42, oy: 0 },
     { name: 'BARON BUZZSAW',    hp: 26, rx: 62,  ry: 38, oy: -8 },
@@ -376,7 +429,7 @@ canvas {
   function reset(withTut) {
     Object.assign(P, { x: 110, y: H / 2, vx: 0, vy: 0, hp: 3, inv: withTut ? 0 : 1.5, fire: 0, rapid: 0, spread: 0, shield: 0, loop: 0, loopCd: 0, ang: 0, dead: false, puff: 0, smoke: 0 });
     bullets = []; eb = []; en = []; pk = []; pt = []; boss = null;
-    spawnT = 1; score = 0; kills = 0; nextBoss = 20; bossesDone = 0; deadT = 0; newBest = false; shake = 0;
+    spawnT = 1; minesSeen = false; score = 0; kills = 0; nextBoss = 20; bossesDone = 0; deadT = 0; newBest = false; shake = 0;
     warn = 0; bossPending = false; lastWarnK = -1; paused = false; ovPause.hidden = true; ovScore.hidden = true; ovBoard.hidden = true; resetTheme(); flashW = 0;
     tut = withTut ? { step: 0, t: 0, moved: 0, tkills: 0, looped: false, lt: 0, picked: false } : null;
     if (withTut) { try { localStorage.setItem('aw_tut', '1'); } catch (e) {} }
@@ -439,6 +492,7 @@ canvas {
     keys[e.code] = true; initAudio();
     if ((e.code === 'KeyP' || e.code === 'Escape') && !e.repeat) { if (state === 'play') setPause(!paused); return; }
     if (paused) return;
+    if (state === 'title' && !modalOpen() && (e.code === 'ArrowLeft' || e.code === 'ArrowRight') && !e.repeat) { setSkin(skin + (e.code === 'ArrowRight' ? 1 : -1)); sfx('pick'); return; }
     if ((e.code === 'Enter' || e.code === 'Space') && state !== 'play') begin();
     if (['ShiftLeft', 'ShiftRight', 'KeyZ', 'KeyL'].includes(e.code) && !e.repeat) doLoop();
   });
@@ -452,6 +506,7 @@ canvas {
   cv.addEventListener('pointerdown', e => {
     try { cv.setPointerCapture(e.pointerId); } catch (err) {}
     initAudio();
+    if (state === 'title' && !modalOpen() && pickSkinAt(posOf(e))) return;
     if (state !== 'play') begin();
     ptr = posOf(e); offX = P.x - ptr.x; offY = P.y - ptr.y;
   });
@@ -493,11 +548,13 @@ canvas {
     const e = { type, x: W + 70, y, y0: y, t: 0, ph: rnd(0, 6), amp: rnd(14, 50), hp: d.hp, w: d.w, h: d.h, sp: d.sp + L * 6, cd: rnd(1, 3), score: d.score, flash: 0, s: d.s, vy: 0 };
     if (type === 'diver') { e.x = W + 40; e.mode = 'enter'; e.aim = 0.7; e.dvx = 0; e.dvy = 0; }
     if (type === 'mine') { e.amp = rnd(20, 45); e.sp = d.sp + L * 2; }
+    if (type === 'hmine') { e.amp = rnd(4, 10); e.sp = d.sp; e.fuse = 0; e.boom = false; }
     return e;
   }
   function spawn() {
     const L = level();
-    const wt = { scout: 10, ace: L >= 2 ? 4 : 0, diver: L >= 2 ? 3 : 0, mine: L >= 3 ? 2 : 0, bomber: L >= 3 ? 1.5 : 0 };
+    const wt = { scout: 10, ace: L >= 2 ? 4 : 0, diver: L >= 2 ? 3 : 0, mine: L >= 3 ? 2 : 0, bomber: L >= 3 ? 1.5 : 0, hmine: L >= 10 ? 3 : 0 };
+    if (L >= 10 && !minesSeen) { minesSeen = true; stageMsg = { text: 'MINEFIELD!', t: 3 }; }
     let tot = 0; for (const k in wt) tot += wt[k];
     let r = Math.random() * tot, type = 'scout';
     for (const k in wt) { if (wt[k] > 0 && (r -= wt[k]) <= 0) { type = k; break; } }
@@ -537,11 +594,28 @@ canvas {
   }
   function detonate() {
     flashW = 0.35; shake = 0.5; sfx('boom');
-    for (const e of en) if (e.hp > 0 && e.x < W + 20) killEnemy(e);
+    for (const e of en) if (e.hp > 0 && e.x < W + 20) {
+      if (e.type === 'hmine') { explode(e.x, e.y, 14, false); score += e.score; e.hp = 0; } else killEnemy(e);
+    }
     eb = [];
     if (boss && boss.ready) { boss.hp -= 6; boss.flash = 0.12; score += 60; explode(boss.x, boss.y, 18, true); if (boss.hp <= 0) bossDefeated(); }
   }
+  function mineBlast(m) {
+    if (m.boom) return; m.boom = true; m.hp = 0;
+    explode(m.x, m.y, 34, true); sfx('boom'); shake = Math.max(shake, 0.35);
+    pt.push({ x: m.x, y: m.y, vx: 0, vy: 0, life: 0.45, max: 0.45, r: 10, grow: BLAST_R * 2.2, col: '#ff8a3d', kind: 'ring' });
+    for (const e of en) {
+      if (e === m || e.hp <= 0) continue;
+      if (Math.hypot(e.x - m.x, e.y - m.y) > BLAST_R + e.w / 2) continue;
+      if (e.type === 'hmine') { if (!e.boom && !(e.fuse > 0)) e.fuse = 0.18; }
+      else { e.hp -= 3; e.flash = 0.1; if (e.hp <= 0) killEnemy(e); }
+    }
+    if (!P.dead && P.inv <= 0 && P.loop <= 0 && !tut && Math.hypot(P.x - m.x, P.y - m.y) < BLAST_R + 10) {
+      if (P.shield > 0) { P.shield = 0; P.inv = 0.9; shake = 0.15; explode(P.x, P.y, 10, false); sfx('hit'); } else hurt();
+    }
+  }
   function killEnemy(e) {
+    if (e.type === 'hmine') { score += e.score; if (tut) tut.tkills++; mineBlast(e); return; }
     explode(e.x, e.y, 22, e.type === 'bomber'); sfx('boom');
     score += e.score; kills++;
     if (tut) tut.tkills++;
@@ -679,8 +753,9 @@ canvas {
           e.x -= 40 * dt; e.y += clamp(P.y - e.y, -1, 1) * 70 * dt; e.aim -= dt;
           if (e.aim <= 0) { const a = Math.atan2(P.y - e.y, P.x - e.x), sp = 300 + level() * 10; e.dvx = Math.cos(a) * sp; e.dvy = Math.sin(a) * sp; e.mode = 'dive'; sfx('dive'); }
         } else { e.x += e.dvx * dt; e.y += e.dvy * dt; }
-      } else if (e.type === 'mine') {
-        e.x -= e.sp * dt; e.y = e.y0 + Math.sin(e.t * 1.6 + e.ph) * e.amp;
+      } else if (e.type === 'mine' || e.type === 'hmine') {
+        e.x -= e.sp * dt; e.y = e.y0 + Math.sin(e.t * (e.type === 'mine' ? 1.6 : 1.1) + e.ph) * e.amp;
+        if (e.type === 'hmine' && e.fuse > 0) { e.fuse -= dt; if (e.fuse <= 0) mineBlast(e); }
       } else {
         if (!(e.holdX && e.x <= e.holdX)) e.x -= e.sp * dt;
         if (e.type === 'scout') e.y = e.y0 + Math.sin(e.t * 2 + e.ph) * e.amp;
@@ -690,9 +765,16 @@ canvas {
       e.vy = (e.y - py) / Math.max(dt, 0.001);
       e.flash = Math.max(0, e.flash - dt);
       e.cd -= dt;
-      if (e.cd <= 0 && e.type !== 'diver' && e.type !== 'mine' && e.x < W - 40 && e.x > P.x + 90 && !P.dead) {
+      if (e.cd <= 0 && e.type !== 'diver' && e.type !== 'mine' && e.type !== 'hmine' && e.x < W - 40 && e.x > P.x + 90 && !P.dead) {
         if (e.type === 'bomber') { efire(e.x - 30, e.y, 3, 0.22, 175 + level() * 6); e.cd = rnd(2, 2.8); }
         else { efire(e.x - 22, e.y, 1, 0, 185 + level() * 8); e.cd = rnd(2.2, 3.8); }
+      }
+    }
+    for (const m of en) {
+      if (m.type !== 'hmine' || m.hp <= 0 || m.boom) continue;
+      for (const e of en) {
+        if (e === m || e.hp <= 0 || e.type === 'hmine' || e.type === 'mine') continue;
+        if (Math.abs(e.x - m.x) < e.w / 2 + 16 && Math.abs(e.y - m.y) < e.h / 2 + 16) { mineBlast(m); break; }
       }
     }
     en = en.filter(e => e.hp > 0 && e.x > -110 && e.x < W + 260 && e.y > -130 && e.y < H + 130);
@@ -761,6 +843,7 @@ canvas {
       let hit = false;
       for (const b of eb) { if (Math.hypot(b.x - P.x, b.y - P.y) < b.r + 11) { b.x = -999; hit = true; break; } }
       if (!hit) for (const e of en) {
+        if (e.type === 'hmine') { if (e.hp > 0 && !e.boom && Math.abs(e.x - P.x) < e.w / 2 + 8 && Math.abs(e.y - P.y) < e.h / 2 + 6) { mineBlast(e); hit = false; break; } continue; }
         if (e.hp > 0 && Math.abs(e.x - P.x) < e.w / 2 + 10 && Math.abs(e.y - P.y) < e.h / 2 + 8) { e.hp -= 2; if (e.hp <= 0) killEnemy(e); hit = true; break; }
       }
       if (!hit && boss) { const dx = (P.x - boss.x) / (boss.rx + 10), dy = (P.y - (boss.y + boss.oy)) / (boss.ry + 10); if (dx * dx + dy * dy < 1) hit = true; }
@@ -888,6 +971,24 @@ canvas {
     circ(e.x, y, 4.8, INK); circ(e.x, y, 3.3, on ? '#e85d4a' : '#7a2a22');
   }
 
+  function drawHMine(e) {
+    const bob = Math.sin(e.t * 2) * 1.5, y = e.y + bob, pulse = 0.5 + 0.5 * Math.sin(e.t * 5), fz = e.fuse > 0;
+    ctx.save(); ctx.translate(e.x, y);
+    ctx.strokeStyle = 'rgba(232,93,74,' + (fz ? 0.8 : 0.22 + pulse * 0.2) + ')'; ctx.lineWidth = 2; ctx.setLineDash([6, 7]);
+    ctx.beginPath(); ctx.arc(0, 0, BLAST_R, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+    ctx.rotate(e.t * 0.5);
+    ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    for (let i = 0; i < 8; i++) {
+      const a = i / 8 * 6.283, c = Math.cos(a), s = Math.sin(a);
+      ctx.beginPath(); ctx.moveTo(c * 15, s * 15); ctx.lineTo(c * 25, s * 25); ctx.stroke();
+      circ(c * 26, s * 26, 3.6, '#f2b632');
+    }
+    ctx.beginPath(); ctx.arc(0, 0, 17, 0, 7); ctx.fillStyle = fz ? '#e85d4a' : '#8c2f26'; ctx.fill(); ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.fillStyle = '#f2b632'; ctx.fillRect(-17, -3.5, 34, 7); ctx.strokeRect(-17, -3.5, 34, 7);
+    ctx.restore();
+    circ(e.x - 5, y - 6, 4, 'rgba(255,255,255,0.2)');
+    circ(e.x, y, 5, INK); circ(e.x, y, 3.4, (fz || pulse > 0.5) ? '#ffe27a' : '#7a2a22');
+  }
   function drawGasbag() {
     const b = boss;
     ctx.save(); ctx.translate(b.x, b.y);
@@ -1163,7 +1264,7 @@ canvas {
 
   function drawTitle() {
     ctx.fillStyle = 'rgba(20,50,61,0.34)'; ctx.fillRect(0, 0, W, H);
-    plane(W / 2, H * 0.5 + Math.sin(T * 2) * 8, Math.sin(T * 2) * 0.06, PAL.hero, { pilot: 'fox', s: 2.2 });
+    plane(W / 2, H * 0.44 + Math.sin(T * 2) * 8, Math.sin(T * 2) * 0.06, PAL.hero, { pilot: 'fox', s: 2.2 });
     const size = Math.min(48, W / 13), ty = H * 0.2;
     txt('ACE WINGFIELD', W / 2 + 3, ty + 4, size, INK, 'center', INK);
     txt('ACE WINGFIELD', W / 2, ty, size, '#f6ead0', 'center', INK);
@@ -1171,6 +1272,13 @@ canvas {
     panel(W / 2 - 250, H * 0.8 - 22, 500, 58, 14, 'rgba(20,50,61,0.78)');
     txt('Tap, click or press Enter to take off', W / 2, H * 0.8 + 2, 17, '#f6ead0', 'center', null, BODY_FONT);
     txt('Three bosses, five kinds of sky pirate. Loop to dodge.', W / 2, H * 0.8 + 26, 14, 'rgba(246,234,208,0.85)', 'center', null, BODY_FONT);
+    for (let i = 0; i < SKINS.length; i++) {
+      const x = swatchX(i), y = swatchY(), sk = SKINS[i], on = i === skin;
+      if (on) { circ(x, y, 21, '#f6ead0'); }
+      circ(x, y, 17, INK); circ(x, y, 14.5, sk.body); ctx.beginPath(); ctx.arc(x, y, 14.5, Math.PI * 1.05, Math.PI * 1.95); ctx.lineTo(x, y); ctx.fillStyle = sk.light; ctx.fill();
+      ctx.fillStyle = sk.stripe; ctx.fillRect(x - 14, y + 2, 28, 4);
+    }
+    txt('< ' + SKINS[skin].name.toUpperCase() + ' >', W / 2, swatchY() + 36, 13, '#f6ead0', 'center', INK);
     if (best > 0) txt('BEST ' + best, W / 2, H * 0.94, 14, '#f2b632', 'center', INK);
   }
   function drawOver() {
@@ -1201,6 +1309,7 @@ canvas {
     ctx.globalAlpha = 1;
     for (const e of en) {
       if (e.type === 'mine') drawMine(e);
+      else if (e.type === 'hmine') drawHMine(e);
       else {
         let ang = -clamp(e.vy / 100, -1, 1) * 0.3;
         if (e.type === 'diver') ang = e.mode === 'dive' ? Math.atan2(e.dvy, e.dvx) - Math.PI : 0;
@@ -1343,5 +1452,3 @@ canvas {
   requestAnimationFrame(frame);
 })();
 </script>
-</body>
-</html>
