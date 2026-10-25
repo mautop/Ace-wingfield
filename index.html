@@ -8,6 +8,9 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <style>html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); background: #14323d; } body { margin: 0; }</style>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
 <title>Ace Wingfield</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -90,16 +93,23 @@ canvas {
 .controls .tog { order: 4; }
 .hint, .rotate { order: 5; flex: 0 0 100%; }
 #stage { min-width: 0; }
-/* sideways on a phone: playfield fills the screen, LOOP and toggles in one column on the right */
+/* sideways on a phone: the sky takes the whole screen; LOOP and the small toggles float over one corner */
+.tog.side-only, .mbtn.side-only { display: none; }
 @media (orientation: landscape) and (max-height: 640px) {
-  body { padding-block: 8px; }
-  .app { flex-direction: row; gap: 8px; }
+  body { padding-block: 4px; padding-left: max(4px, env(safe-area-inset-left, 0px)); padding-right: max(4px, env(safe-area-inset-right, 0px)); }
+  .app { position: relative; flex-direction: row; gap: 0; }
   .controls { display: contents; }
-  .side { display: flex; flex-direction: column; gap: 8px; flex: 0 0 auto; width: clamp(96px, 13vw, 136px); min-height: 0; overflow: hidden; order: 2; }
-  .pills { display: flex; flex-direction: column; gap: 5px; }
-  .side .btn { order: 0; flex: 1 1 0; height: auto; min-height: 70px; font-size: 20px; }
+  .side { position: absolute; right: 10px; bottom: 10px; z-index: 5; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; pointer-events: none; }
+  .app.left .side { right: auto; left: 10px; align-items: flex-start; }
+  .pills { display: flex; flex-direction: column; gap: 4px; align-items: inherit; order: 1; pointer-events: none; }
+  .pills > .tog, .side > .btn { pointer-events: auto; }
+  .side .btn.loop { order: 2; flex: none; width: 66px; height: 66px; border-radius: 50%; font-size: 14px; padding: 0; opacity: 0.92; }
   .hint, .rotate { display: none; }
-  .controls .tog { order: 0; padding: 4px 6px; font-size: 12px; line-height: 1.2; text-align: center; flex: 0 0 auto; }
+  .controls .tog { order: 0; padding: 4px 10px; font-size: 12px; line-height: 1.2; flex: none; opacity: 0.94; }
+  .tog.side-only { display: block; }
+  .mbtn.side-only { display: block; }
+  body.playing .tog.sys { display: none; }
+  .controls .tog.act { background: rgba(20,50,61,0.62); }
 }
 
 /* pause menu */
@@ -162,9 +172,12 @@ canvas {
           <button class="mbtn" id="mRestart" type="button">Restart run</button>
           <button class="mbtn" id="mPractice" type="button">Practice flight</button>
           <button class="mbtn" id="mSkip" type="button" hidden>Skip tutorial</button>
+          <button class="mbtn" id="mMusic" type="button">Music: on</button>
+          <button class="mbtn" id="mSound" type="button">Sound: on</button>
+          <button class="mbtn side-only" id="mSide" type="button">Swap LOOP side</button>
           <button class="mbtn" id="mQuit" type="button">Quit to title</button>
         </div>
-        <p class="small note">P or Esc also pauses. Music and sound switches are below the playfield.</p>
+        <p class="small note">P or Esc also pauses.</p>
       </div>
     </div>
     <div class="ov" id="ovScore" hidden>
@@ -195,10 +208,11 @@ canvas {
       <div class="pills">
         <button class="tog act" id="btnPause" type="button" hidden>Pause</button>
         <button class="tog act" id="togSkip" type="button" hidden>Skip tutorial</button>
-        <button class="tog" id="togMusic" type="button" aria-pressed="true">Music</button>
-        <button class="tog" id="togSound" type="button" aria-pressed="true">Sound</button>
-        <button class="tog" id="togHow" type="button">How to play</button>
-        <button class="tog" id="togScores" type="button" hidden>High scores</button>
+        <button class="tog sys" id="togMusic" type="button" aria-pressed="true">Music</button>
+        <button class="tog sys" id="togSound" type="button" aria-pressed="true">Sound</button>
+        <button class="tog sys side-only" id="togSide" type="button">Swap side</button>
+        <button class="tog sys" id="togHow" type="button">How to play</button>
+        <button class="tog sys" id="togScores" type="button" hidden>High scores</button>
       </div>
     </div>
     <div class="hint">Arrows or WASD to fly &middot; your gun fires by itself &middot; Shift to loop (no hits mid-loop) &middot; P to pause</div>
@@ -222,7 +236,7 @@ canvas {
     const bw = stage.clientWidth, bh = stage.clientHeight;
     if (bw < 10 || bh < 10) return;
     const aspect = bw / bh;
-    if (aspect >= 560 / 450 * 1.14) { H = 450; W = Math.round(clamp(H * aspect, 640, 840)); }
+    if (aspect >= 560 / 450 * 1.14) { H = 450; W = Math.round(clamp(H * aspect, 640, 960)); }
     else if (aspect >= 0.9) { W = 560; H = Math.round(clamp(W / aspect, 450, 620)); }
     else { W = 480; H = Math.round(clamp(W / aspect, 600, 800)); }
     const s = Math.min(bw / W, bh / H);
@@ -301,11 +315,26 @@ canvas {
   const PA = [76,0,72,0,79,0,76,72, 81,0,76,0,72,76,81,0, 77,0,72,0,81,0,77,72, 79,0,74,0,71,74,79,0];
   const PB = [84,0,79,76,72,0,76,79, 81,0,76,0,81,0,84,81, 77,81,84,81,77,0,72,0, 79,0,83,0,86,0,0,0];
   const PC = [81,0,0,81,84,0,83,0, 77,0,0,77,81,0,79,0, 79,0,0,79,83,0,81,0, 76,0,80,0,83,0,80,76];
+  /* night: slow and dreamy, minor arpeggios */
+  const NA = [69,0,72,0,76,0,72,0, 65,0,69,0,72,0,69,0, 67,0,71,0,74,0,71,0, 64,0,68,0,71,0,68,0];
+  const NB = [76,0,0,74,72,0,0,0, 77,0,0,76,72,0,0,0, 74,0,0,72,71,0,0,0, 76,0,0,0,68,0,71,0];
+  const NC = [69,69,0,72,0,69,0,76, 67,67,0,71,0,67,0,74, 65,65,0,69,0,65,0,72, 64,64,0,68,0,64,71,0];
+  /* storm: dark and driving, low saw riffs */
+  const SA = [62,0,0,65,0,62,0,69, 58,0,0,62,0,58,0,65, 60,0,0,64,0,60,0,67, 57,0,0,61,0,57,0,64];
+  const SB = [69,0,67,0,65,0,62,0, 70,0,69,0,65,0,62,0, 72,0,70,0,67,0,64,0, 73,0,69,0,64,0,61,0];
+  const SC = [74,74,0,74,77,0,76,0, 72,72,0,72,75,0,74,0, 70,70,0,70,73,0,72,0, 69,69,0,69,73,0,76,0];
   const SONGS = {
-    title: { bpm: 92,  roots: [48, 45, 41, 43], phr: [PA],     lead: 'triangle', leadVol: 0.07,  bass: 'long',  drums: false },
-    play:  { bpm: 132, roots: [48, 45, 41, 43], phr: [PA, PB], lead: 'square',   leadVol: 0.026, bass: 'walk',  drums: true },
-    boss:  { bpm: 160, roots: [45, 41, 43, 40], phr: [PC],     lead: 'square',   leadVol: 0.03,  bass: 'pulse', drums: true, hat: 'all' }
+    title:  { bpm: 92,  roots: [48, 45, 41, 43], phr: [PA],     lead: 'triangle', leadVol: 0.07,  bass: 'long',  drums: false },
+    play:   { bpm: 132, roots: [48, 45, 41, 43], phr: [PA, PB], lead: 'square',   leadVol: 0.026, bass: 'walk',  drums: true },
+    boss:   { bpm: 160, roots: [45, 41, 43, 40], phr: [PC],     lead: 'square',   leadVol: 0.03,  bass: 'pulse', drums: true, hat: 'all' },
+    playN:  { bpm: 104, roots: [45, 41, 43, 40], phr: [NA, NB], lead: 'sine',     leadVol: 0.085, bass: 'long',  drums: false },
+    bossN:  { bpm: 148, roots: [45, 43, 41, 40], phr: [NC],     lead: 'sawtooth', leadVol: 0.022, bass: 'pulse', drums: true, hat: 'all' },
+    playS:  { bpm: 138, roots: [38, 34, 36, 33], phr: [SA, SB], lead: 'sawtooth', leadVol: 0.02,  bass: 'walk',  drums: true },
+    bossS:  { bpm: 172, roots: [38, 36, 34, 33], phr: [SC],     lead: 'sawtooth', leadVol: 0.026, bass: 'pulse', drums: true, hat: 'all' }
   };
+  const SKY_SFX = ['', 'N', 'S'];
+  const songKey = () => musicMode === 'title' ? 'title' : musicMode + SKY_SFX[themeTo];
+  let mKey = '';
   let musicMode = 'none', mStep = 0, mNext = 0, mReset = true;
   function setMusic(m) { if (m === musicMode) return; musicMode = m; mStep = 0; mReset = true; }
   function mtone(f, t, dur, type, vol) {
@@ -341,7 +370,8 @@ canvas {
   }
   function musicTick() {
     if (!AC || !mGain || AC.state !== 'running' || !musicOn || paused || document.hidden || musicMode === 'none') { mReset = true; return; }
-    const S = SONGS[musicMode], sd = 60 / S.bpm / 2, now = AC.currentTime;
+    const key = songKey(); if (key !== mKey) { mKey = key; mStep = 0; mReset = true; }
+    const S = SONGS[key], sd = 60 / S.bpm / 2, now = AC.currentTime;
     if (mReset || mNext < now - 0.1) { mNext = now + 0.06; mReset = false; }
     while (mNext < now + 0.25) { playStep(S, mStep, mNext, sd); mNext += sd; mStep++; }
   }
@@ -360,7 +390,59 @@ canvas {
   const diff = () => Math.min(level(), 25);   /* speeds stop climbing at wave 25 so the late waves stay fair */
   const RANKS = ['', 'ACE', 'DOUBLE ACE', 'TRIPLE ACE', 'QUADRUPLE ACE', 'ACE OF ACES'];
   const rankOf = w => Math.min(4, Math.floor((w - 1) / 20));
-  let curRank = 0, bestRank = 0, wonT = 0, fwT = 0;
+  let curRank = 0, bestRank = 0, wonT = 0, fwT = 0, overT = 0;
+  /* bonus rounds: Balloon Rally after the first boss and at each ace title */
+  let bonus = null, bonusQueued = false, bonusWait = 0, bl = [];
+  const BONUS_T = 15, BONUS_TIERS = [6, 12, 18];
+  const BL_COL = ['#e85d4a', '#f2b632', '#63c9ba', '#a47fcb', '#ff7aa8', '#6ec6ff'];
+  function queueBonus(wait) { bonusQueued = true; bonusWait = wait; }
+  function startBonus() {
+    bonusQueued = false; en = []; eb = []; bullets = []; bl = [];
+    bonus = { phase: 'run', t: BONUS_T, spawnT: 0.4, caught: 0, gold: 0, resT: 0, text: [] };
+    P.inv = Math.max(P.inv, 3); setMusic('title'); sfx('step'); stageMsg = { text: 'BONUS ROUND!', t: 2.5 };
+  }
+  function spawnBalloons() {
+    const pat = Math.floor(rnd(0, 4)), n = pat === 3 ? 3 : 5, cy = rnd(90, H - 90), x0 = W + 30, goldAt = Math.random() < 0.6 ? Math.floor(rnd(0, n)) : -1;
+    for (let i = 0; i < n; i++) {
+      let y = cy, x = x0 + i * 46;
+      if (pat === 1) y = cy + Math.sin(i * 1.1) * 70;
+      else if (pat === 2) y = cy + (i - 2) * 34;
+      else if (pat === 3) { x = x0 + i * 34; y = cy + (i - 1) * 70; }
+      bl.push({ x, y: clamp(y, 50, H - 50), ph: rnd(0, 6), col: BL_COL[Math.floor(rnd(0, BL_COL.length))], gold: i === goldAt, got: false });
+    }
+  }
+  function endBonus(reward) {
+    const c = bonus.caught, tx = [];
+    if (reward) {
+      if (c >= BONUS_TIERS[0]) { P.hp = Math.min(5, P.hp + 1); tx.push('+1 heart'); }
+      if (c >= BONUS_TIERS[1]) { P.shield = 12; tx.push('shield'); }
+      if (c >= BONUS_TIERS[2]) { P.rapid = 8; P.spread = 9; tx.push('rapid fire + spread shot'); }
+      if (!tx.length) tx.push('no reward this time');
+      sfx('pick');
+    } else tx.push('skipped');
+    bonus.phase = 'result'; bonus.resT = reward ? 3 : 0.7; bonus.text = tx; bl = [];
+  }
+  function updBonus(dt) {
+    if (bonus.phase === 'result') {
+      bonus.resT -= dt;
+      if (bonus.resT <= 0) { bonus = null; spawnT = 1.6; setMusic('play'); }
+      return;
+    }
+    bonus.t -= dt; bonus.spawnT -= dt;
+    if (bonus.spawnT <= 0 && bonus.t > 3) { spawnBalloons(); bonus.spawnT = rnd(1.1, 1.6); }
+    for (const b of bl) b.x -= 150 * dt;
+    for (const b of bl) {
+      if (!b.got && !P.dead && Math.hypot(b.x - P.x, b.y + Math.sin(T * 2 + b.ph) * 3 - P.y) < 30) {
+        b.got = true; bonus.caught += b.gold ? 2 : 1; if (b.gold) { bonus.gold++; score += 250; }
+        sfx('pick');
+        const col = b.gold ? '#ffd24a' : b.col;
+        for (let i = 0; i < 9; i++) { const a = rnd(0, 6.28); pt.push({ x: b.x, y: b.y, vx: Math.cos(a) * 110, vy: Math.sin(a) * 110, life: 0.45, max: 0.45, r: 3, col, kind: 'spark' }); }
+      }
+    }
+    bl = bl.filter(b => !b.got && b.x > -40);
+    if (bonus.t <= 0) endBonus(true);
+  }
+  const skipRect = () => ({ x: W / 2 - 44, y: H - 40, w: 88, h: 30 });
   try { bestRank = +localStorage.getItem('aw_rank') || 0; } catch (e) {}
   function saveRank(r) { if (r > bestRank) { bestRank = r; try { localStorage.setItem('aw_rank', String(r)); } catch (e) {} } }
 
@@ -421,6 +503,7 @@ canvas {
   const btnPause = $('btnPause'), togHow = $('togHow'), togScores = $('togScores'), togSkip = $('togSkip'), togMusic = $('togMusic'), togSound = $('togSound');
   const ovPause = $('ovPause');
   function updUI() {
+    document.body.classList.toggle('playing', state === 'play');
     btnPause.hidden = state !== 'play';
     togHow.hidden = state === 'play';
     togScores.hidden = state === 'play' || !hs.db;
@@ -430,7 +513,7 @@ canvas {
   function reset(withTut) {
     Object.assign(P, { x: 110, y: H / 2, vx: 0, vy: 0, hp: 3, inv: withTut ? 0 : 1.5, fire: 0, rapid: 0, spread: 0, shield: 0, loop: 0, loopCd: 0, ang: 0, dead: false, puff: 0, smoke: 0 });
     bullets = []; eb = []; en = []; pk = []; pt = []; boss = null;
-    spawnT = 1; minesSeen = false; curRank = 0; wonT = 0; score = 0; kills = 0; nextBoss = 20; bossesDone = 0; deadT = 0; newBest = false; shake = 0;
+    spawnT = 1; minesSeen = false; curRank = 0; wonT = 0; bonus = null; bonusQueued = false; bl = []; score = 0; kills = 0; nextBoss = 20; bossesDone = 0; deadT = 0; newBest = false; shake = 0;
     warn = 0; bossPending = false; lastWarnK = -1; paused = false; ovPause.hidden = true; ovScore.hidden = true; ovBoard.hidden = true; resetTheme(); flashW = 0;
     tut = withTut ? { step: 0, t: 0, moved: 0, tkills: 0, looped: false, lt: 0, picked: false } : null;
     if (withTut) { try { localStorage.setItem('aw_tut', '1'); } catch (e) {} }
@@ -441,12 +524,14 @@ canvas {
   function begin() {
     if (state === 'play' || modalOpen()) return;
     if (state === 'won' && wonT < 2.5) return;
+    if (state === 'over' && overT < 0.8) return;
     let first = false;
     try { first = !localStorage.getItem('aw_tut'); } catch (e) {}
     reset(first);
   }
   function toTitle() {
     bullets = []; eb = []; en = []; pk = []; boss = null; tut = null; warn = 0; bossPending = false; paused = false; ovPause.hidden = true; ovScore.hidden = true; ovBoard.hidden = true; resetTheme(); flashW = 0;
+    bonus = null; bonusQueued = false; bl = [];
     state = 'title'; setMusic('title'); updUI();
   }
 
@@ -465,8 +550,32 @@ canvas {
   /* ---------- input ---------- */
   const keys = {};
   let ptr = null, offX = 0, offY = 0;
-  togSound.addEventListener('click', () => { sfxOn = !sfxOn; togSound.setAttribute('aria-pressed', String(sfxOn)); initAudio(); sfx('pick'); });
-  togMusic.addEventListener('click', () => { musicOn = !musicOn; togMusic.setAttribute('aria-pressed', String(musicOn)); initAudio(); mReset = true; });
+  const mMusicB = $('mMusic'), mSoundB = $('mSound');
+  function syncToggles() {
+    togSound.setAttribute('aria-pressed', String(sfxOn)); togMusic.setAttribute('aria-pressed', String(musicOn));
+    mSoundB.textContent = 'Sound: ' + (sfxOn ? 'on' : 'off'); mMusicB.textContent = 'Music: ' + (musicOn ? 'on' : 'off');
+  }
+  const flipSound = () => { sfxOn = !sfxOn; syncToggles(); initAudio(); sfx('pick'); };
+  const flipMusic = () => { musicOn = !musicOn; syncToggles(); initAudio(); mReset = true; };
+  togSound.addEventListener('click', flipSound); mSoundB.addEventListener('click', flipSound);
+  togMusic.addEventListener('click', flipMusic); mMusicB.addEventListener('click', flipMusic);
+  /* LOOP sits on the thumb side: rotate the phone the other way and it moves to the other side */
+  const appEl = document.querySelector('.app'), overlayMQ = window.matchMedia ? window.matchMedia('(orientation: landscape) and (max-height: 640px)') : null;
+  let flipSide = false, loopLeft = false;
+  try { flipSide = localStorage.getItem('aw_flip') === '1'; } catch (e) {}
+  function applySide() {
+    let ang = 90;
+    try { if (screen.orientation && typeof screen.orientation.angle === 'number') ang = screen.orientation.angle; else if (typeof window.orientation === 'number') ang = window.orientation; } catch (e) {}
+    const baseLeft = ang === 270 || ang === -90;
+    loopLeft = baseLeft !== flipSide;
+    appEl.classList.toggle('left', loopLeft);
+  }
+  const hudShift = () => (loopLeft && overlayMQ && overlayMQ.matches) ? 86 : 0;
+  function swapSide() { flipSide = !flipSide; try { localStorage.setItem('aw_flip', flipSide ? '1' : '0'); } catch (e) {} applySide(); }
+  $('togSide').addEventListener('click', swapSide); $('mSide').addEventListener('click', swapSide);
+  applySide(); syncToggles();
+  try { if (screen.orientation && screen.orientation.addEventListener) screen.orientation.addEventListener('change', applySide); } catch (e) {}
+  addEventListener('orientationchange', applySide); addEventListener('resize', applySide);
   btnPause.addEventListener('click', () => setPause(true));
   togHow.addEventListener('click', () => { initAudio(); reset(true); });
   function skipTut() { if (tut) endTut(); }
@@ -490,10 +599,12 @@ canvas {
     if (e.code === 'Escape' && !ovBoard.hidden) { closeBoard(); return; }
     if (!paused && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
     keys[e.code] = true; initAudio();
+    if (state === 'over' && !modalOpen() && !e.repeat && (e.code === 'Escape' || e.code === 'KeyH') && overT >= 0.8) { toTitle(); return; }
     if ((e.code === 'KeyP' || e.code === 'Escape') && !e.repeat) { if (state === 'play') setPause(!paused); return; }
     if (paused) return;
     if (state === 'title' && !modalOpen() && (e.code === 'ArrowLeft' || e.code === 'ArrowRight') && !e.repeat) { setSkin(skin + (e.code === 'ArrowRight' ? 1 : -1)); sfx('pick'); return; }
     if ((e.code === 'Enter' || e.code === 'Space') && state !== 'play') begin();
+    else if (e.code === 'Enter' && bonus && bonus.phase === 'run' && !e.repeat) endBonus(false);
     if (['ShiftLeft', 'ShiftRight', 'KeyZ', 'KeyL'].includes(e.code) && !e.repeat) doLoop();
   });
   addEventListener('keyup', e => { keys[e.code] = false; });
@@ -507,6 +618,8 @@ canvas {
     try { cv.setPointerCapture(e.pointerId); } catch (err) {}
     initAudio();
     if (state === 'title' && !modalOpen() && pickSkinAt(posOf(e))) return;
+    if (state === 'over' && !modalOpen()) { overTap(posOf(e)); return; }
+    if (bonus && bonus.phase === 'run' && state === 'play' && !paused) { const q = posOf(e), r = skipRect(); if (q.x >= r.x && q.x <= r.x + r.w && q.y >= r.y && q.y <= r.y + r.h) { endBonus(false); return; } }
     if (state !== 'play') begin();
     ptr = posOf(e); offX = P.x - ptr.x; offY = P.y - ptr.y;
   });
@@ -645,6 +758,7 @@ canvas {
     sfx('boom'); score += 5000; shake = 0.6;
     drop(boss.x - 30, boss.y, 'heart'); drop(boss.x + 30, boss.y - 20);
     eb = []; boss = null; bossesDone++; nextBoss = kills + 22; setMusic('play'); setTheme(bossesDone % 3, true);
+    if (bossesDone === 1) queueBonus(2.2);
   }
 
   /* tutorial */
@@ -666,7 +780,7 @@ canvas {
     else if (tut.step === 1) { if (!en.some(e => e.hp > 0)) { if (tut.tkills >= 2) tutNext(); else spawnTarget(); } }
     else if (tut.step === 2) { if (tut.looped) { tut.lt += dt; if (tut.lt > 0.9) tutNext(); } }
     else if (tut.step === 3) { if (tut.picked) tutNext(); else if (!pk.length) pk.push({ x: W * 0.78, y: H * 0.5, vx: -28, t: 0, kind: 'star' }); }
-    else if (tut.step === 4) { if (tut.t > 2.4) endTut(); }
+    else if (tut.step === 4) { if (tut.t > 3.4) endTut(); }
   }
 
   function update(dt) {
@@ -681,6 +795,7 @@ canvas {
       if (nextBolt <= 0) { bolt = 0.3; boltX = rnd(80, W - 80); nextBolt = rnd(3.5, 8); sfx('thunder'); }
     }
     updParts(dt);
+    if (state === 'over') overT += dt;
     if (state === 'won') {
       wonT += dt; fwT -= dt;
       if (fwT <= 0) {
@@ -694,7 +809,7 @@ canvas {
 
     if (P.dead) {
       deadT += dt;
-      if (deadT > 1.4) { state = 'over'; saveRank(curRank); lastRun = { score, wave: level(), bosses: bossesDone }; setMusic('title'); updUI(); offerScore(); }
+      if (deadT > 1.4) { state = 'over'; overT = 0; saveRank(curRank); lastRun = { score, wave: level(), bosses: bossesDone }; setMusic('title'); updUI(); offerScore(); }
     } else {
       P.inv = Math.max(0, P.inv - dt); P.fire -= dt; P.rapid = Math.max(0, P.rapid - dt); P.spread = Math.max(0, P.spread - dt); P.shield = Math.max(0, P.shield - dt); P.loopCd = Math.max(0, P.loopCd - dt);
       if (P.loop > 0) P.loop = Math.max(0, P.loop - dt);
@@ -711,7 +826,7 @@ canvas {
       P.x = clamp(P.x + P.vx * dt, 40, W - 70); P.y = clamp(P.y + P.vy * dt, 34, H - 34);
       P.ang = P.loop > 0 ? -(1 - P.loop / LOOP_T) * Math.PI * 2 : clamp(P.vy / 380, -1, 1) * 0.35;
 
-      if (P.fire <= 0 && P.loop <= 0) {
+      if (P.fire <= 0 && P.loop <= 0 && !bonus) {
         if (P.spread > 0) bullets.push({ x: P.x + 36, y: P.y + 2, vx: 640 }, { x: P.x + 34, y: P.y - 2, vx: 620, vy: -120 }, { x: P.x + 34, y: P.y + 6, vx: 620, vy: 120 });
         else { bullets.push({ x: P.x + 36, y: P.y + 2, vx: 640 }); if (P.rapid > 0) bullets.push({ x: P.x + 30, y: P.y - 7, vx: 640 }); }
         P.fire = P.rapid > 0 ? 0.12 : 0.22;
@@ -727,12 +842,15 @@ canvas {
     // ranks and the final victory
     if (!P.dead && !tut) {
       const rk = rankOf(level());
-      if (rk > curRank) { curRank = rk; stageMsg = { text: RANKS[rk] + '!', t: 3 }; sfx('pick'); flashW = 0.3; }
-      if (kills >= WIN_KILLS && !boss && !bossPending) { winGame(); return; }
+      if (rk > curRank) { curRank = rk; stageMsg = { text: RANKS[rk] + '!', t: 3 }; sfx('pick'); flashW = 0.3; queueBonus(3.4); }
+      if (bonusQueued && !bonus && !boss && !bossPending) { bonusWait -= dt; if (bonusWait <= 0) startBonus(); }
+      if (kills >= WIN_KILLS && !boss && !bossPending && !bonus && !bonusQueued) { winGame(); return; }
     }
 
+    if (bonus) updBonus(dt);
+
     // spawning and the boss warning
-    if (!P.dead && !tut) {
+    if (!P.dead && !tut && !bonus) {
       if (!boss && !bossPending && kills >= nextBoss) { bossPending = true; warn = 2.4; lastWarnK = -1; setMusic('boss'); }
       if (bossPending) {
         warn -= dt;
@@ -1100,6 +1218,33 @@ canvas {
     }
   }
 
+  function drawBalloon(b) {
+    const y = b.y + Math.sin(T * 2 + b.ph) * 3, g = b.gold, col = g ? '#ffd24a' : b.col;
+    if (g) { ctx.globalAlpha = 0.25 + 0.2 * Math.sin(T * 6 + b.ph); circ(b.x, y, 27, '#fff3b0'); ctx.globalAlpha = 1; }
+    ctx.strokeStyle = INK; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(b.x, y + 20); ctx.quadraticCurveTo(b.x - 5, y + 30, b.x + 2, y + 40); ctx.stroke();
+    poly([[b.x - 3.5, y + 24], [b.x + 3.5, y + 24], [b.x, y + 19]], col);
+    ctx.beginPath(); ctx.ellipse(b.x, y, 15, 19, 0, 0, 7); ctx.fillStyle = col; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = INK; ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(b.x - 5, y - 7, 3.4, 6, -0.4, 0, 7); ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.fill();
+    if (g) txt('★', b.x, y + 6, 17, '#a63a2c', 'center');
+  }
+  function drawBonus() {
+    if (bonus.phase === 'run') {
+      const w = Math.min(300, W - 260), x = W / 2 - w / 2;
+      panel(x, 8, w, 46, 12, 'rgba(246,234,208,0.92)');
+      txt('BONUS ROUND', W / 2, 26, 14, '#a63a2c', 'center');
+      rr(x + 14, 34, w - 28, 8, 4, 'rgba(20,50,61,0.18)');
+      rr(x + 14, 34, (w - 28) * clamp(bonus.t / BONUS_T, 0, 1), 8, 4, '#f2b632');
+      const c = bonus.caught, nxt = BONUS_TIERS.find(t => c < t);
+      txt('CAUGHT ' + c + (nxt ? '   NEXT REWARD AT ' + nxt : '   ALL REWARDS EARNED'), W / 2, 76, 14, '#f6ead0', 'center', INK);
+      const r = skipRect(); panel(r.x, r.y, r.w, r.h, 12, 'rgba(20,50,61,0.7)');
+      txt('SKIP', r.x + r.w / 2, r.y + 20, 13, '#f6ead0', 'center');
+    } else {
+      const sz = Math.min(38, W / 16);
+      txt('BONUS COMPLETE', W / 2, H * 0.3, sz, '#f2b632', 'center', INK);
+      txt(bonus.caught + ' caught', W / 2, H * 0.3 + 34, 20, '#f6ead0', 'center', INK);
+      txt(bonus.text.join('  ·  '), W / 2, H * 0.3 + 64, 17, '#f6ead0', 'center', INK, BODY_FONT);
+    }
+  }
   function drawPickup(k) {
     const y = k.y + Math.sin(k.t * 2) * 6, col = PK_COL[k.kind] || '#f2b632';
     ctx.strokeStyle = 'rgba(20,50,61,0.6)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(k.x, y + 22); ctx.lineTo(k.x + Math.sin(k.t * 3) * 3, y + 36); ctx.stroke();
@@ -1243,10 +1388,11 @@ canvas {
     txt('BEST ' + best, W - 63, 44, 11, '#a63a2c', 'center');
     if (curRank > 0) txt(RANKS[curRank], W - 63, 68, 13, '#f2b632', 'center', INK);
     const lm = 1 - P.loopCd / LOOP_CD;
-    panel(10, H - 34, 128, 24, 12, 'rgba(246,234,208,0.9)');
-    rr(18, H - 26, 60, 8, 4, 'rgba(20,50,61,0.2)'); rr(18, H - 26, 60 * lm, 8, 4, lm >= 1 ? '#e0a010' : '#6aa8a0');
-    txt('LOOP', 84, H - 18, 11, INK, 'left');
-    let mx = 146;
+    const hx = hudShift();
+    panel(10 + hx, H - 34, 128, 24, 12, 'rgba(246,234,208,0.9)');
+    rr(18 + hx, H - 26, 60, 8, 4, 'rgba(20,50,61,0.2)'); rr(18 + hx, H - 26, 60 * lm, 8, 4, lm >= 1 ? '#e0a010' : '#6aa8a0');
+    txt('LOOP', 84 + hx, H - 18, 11, INK, 'left');
+    let mx = 146 + hx;
     for (const [label, val, max, col] of [['RAPID', P.rapid, 8, '#e85d4a'], ['SPREAD', P.spread, 9, '#a47fcb'], ['SHIELD', P.shield, 12, '#4aa8e8']]) {
       if (val <= 0) continue;
       panel(mx, H - 34, 138, 24, 12, 'rgba(246,234,208,0.9)');
@@ -1281,7 +1427,7 @@ canvas {
     else if (s === 1) body = 'Your gun fires by itself. Shoot down 2 targets (' + Math.min(2, tut.tkills) + '/2)';
     else if (s === 2) body = (COARSE ? 'Tap LOOP' : 'Press SHIFT') + ' to loop the loop. You are safe mid-loop.';
     else if (s === 3) body = 'Fly into the balloon. Hearts heal, stars give rapid fire.';
-    else body = "That's the basics. Good luck, ace!";
+    else body = 'Later: spread shots, shields, bombs and mines. Go, ace!';
     const w = Math.min(W - 40, 480), x = W / 2 - w / 2, y = 72;
     panel(x, y, w, 56, 14, 'rgba(246,234,208,0.92)');
     txt(heads[s], x + 16, y + 24, 14, '#a63a2c', 'left');
@@ -1325,17 +1471,47 @@ canvas {
       txt('Tap, click or press Enter to start a new run', W / 2, H * 0.8 + 2, 17, '#f6ead0', 'center', null, BODY_FONT);
     }
   }
+  function overBtns() {
+    const bw = Math.min(210, (W - 60) / 2), bh = 50, gap = 16, y = H * 0.76;
+    return [
+      { x: W / 2 - gap / 2 - bw, y, w: bw, h: bh, label: 'FLY AGAIN', col: '#f2b632', ink: INK, act: () => begin() },
+      { x: W / 2 + gap / 2, y, w: bw, h: bh, label: 'HOME SCREEN', col: '#2a9d8f', ink: '#f6ead0', act: () => toTitle() }
+    ];
+  }
+  function overTap(p) {
+    if (overT < 0.8) return;
+    for (const b of overBtns()) if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) { sfx('pick'); b.act(); return; }
+  }
   function drawOver() {
-    ctx.fillStyle = 'rgba(20,50,61,0.55)'; ctx.fillRect(0, 0, W, H);
-    const size = Math.min(52, W / 12);
-    txt('SHOT DOWN', W / 2 + 3, H * 0.34 + 4, size, INK, 'center', INK);
-    txt('SHOT DOWN', W / 2, H * 0.34, size, '#e85d4a', 'center', INK);
-    if (curRank > 0) txt('RANK: ' + RANKS[curRank], W / 2, H * 0.42, 20, '#f2b632', 'center', INK);
+    ctx.fillStyle = 'rgba(20,50,61,0.58)'; ctx.fillRect(0, 0, W, H);
+    const size = Math.min(48, W / 13);
+    txt('SHOT DOWN', W / 2 + 3, H * 0.15 + 4, size, INK, 'center', INK);
+    txt('SHOT DOWN', W / 2, H * 0.15, size, '#e85d4a', 'center', INK);
+    // rank badge
+    const pulse = 1 + Math.sin(T * 3.2) * 0.025, by = H * 0.3;
+    ctx.save(); ctx.translate(W / 2, by); ctx.scale(pulse, pulse);
+    if (curRank > 0) {
+      const label = RANKS[curRank], fs = Math.min(34, W / 18), bw = Math.min(W - 40, label.length * fs * 0.78 + 70);
+      panel(-bw / 2, -26, bw, 52, 26, 'rgba(242,182,50,0.96)');
+      txt(label, 0, 9, fs, INK, 'center');
+      txt('RANK', 0, -34, 13, '#f2b632', 'center', INK);
+    } else {
+      panel(-170, -22, 340, 44, 22, 'rgba(246,234,208,0.14)');
+      txt('Reach wave 21 to earn the rank of Ace', 0, 6, 15, '#f6ead0', 'center', null, BODY_FONT);
+    }
+    ctx.restore();
     txt('SCORE ' + score, W / 2, H * 0.5, 26, '#f6ead0', 'center', INK);
-    txt(newBest ? 'NEW BEST!' : 'BEST ' + best, W / 2, H * 0.6, 18, '#f2b632', 'center', INK);
-    txt('Wave ' + level() + '  ·  Bosses downed ' + bossesDone, W / 2, H * 0.68, 15, '#f6ead0', 'center', INK, BODY_FONT);
-    panel(W / 2 - 230, H * 0.78 - 24, 460, 40, 14, 'rgba(20,50,61,0.78)');
-    txt('Tap, click or press Enter to fly again', W / 2, H * 0.78 + 2, 17, '#f6ead0', 'center', null, BODY_FONT);
+    txt(newBest ? 'NEW BEST!' : 'BEST ' + best, W / 2, H * 0.585, 18, '#f2b632', 'center', INK);
+    txt('Wave ' + level() + '  ·  Bosses downed ' + bossesDone, W / 2, H * 0.66, 15, '#f6ead0', 'center', INK, BODY_FONT);
+    const ready = overT >= 0.8;
+    ctx.globalAlpha = ready ? 1 : 0.45;
+    for (const b of overBtns()) {
+      rr(b.x, b.y + 4, b.w, b.h, 14, INK);
+      panel(b.x, b.y, b.w, b.h, 14, b.col);
+      txt(b.label, b.x + b.w / 2, b.y + b.h / 2 + 7, 19, b.ink, 'center');
+    }
+    ctx.globalAlpha = 1;
+    txt('Enter: fly again  ·  Esc: home screen', W / 2, H * 0.76 + 76, 12, 'rgba(246,234,208,0.7)', 'center', null, BODY_FONT);
   }
 
   function finish() {
@@ -1368,6 +1544,7 @@ canvas {
     }
     if (boss) drawBoss();
     for (const k of pk) drawPickup(k);
+    for (const b of bl) drawBalloon(b);
     for (const b of bullets) {
       ctx.save(); ctx.translate(b.x, b.y); if (b.vy) ctx.rotate(Math.atan2(b.vy, b.vx));
       rr(-22, -1.5, 22, 3, 1.5, 'rgba(255,243,176,0.3)');
@@ -1396,8 +1573,9 @@ canvas {
     else {
       drawHUD();
       if (bossPending && warn > 0) drawWarn();
+      if (bonus) drawBonus();
       if (tut) drawTut();
-      if (stageMsg) drawStageMsg();
+      if (stageMsg && state !== 'over') drawStageMsg();
       if (state === 'over') drawOver();
       if (state === 'won') drawWon();
     }
