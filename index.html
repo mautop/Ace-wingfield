@@ -88,25 +88,33 @@ canvas {
 .rotate { display: none; font-size: 13px; color: var(--sun); text-align: center; }
 @media (orientation: portrait) and (pointer: coarse) { .rotate { display: block; } .hint { display: none; } }
 /* upright: a wide LOOP button, then the toggles, then the hint */
-.side, .pills { display: contents; }
+.side, .pills, .lrow { display: contents; }
+.pi { display: none; }
 .btn.loop { order: 1; flex: 1 1 100%; }
 .controls .tog { order: 4; }
 .hint, .rotate { order: 5; flex: 0 0 100%; }
 #stage { min-width: 0; }
-/* sideways on a phone: the sky takes the whole screen; LOOP and the small toggles float over one corner */
+/* sideways on a phone: the sky is edge to edge; Pause and LOOP float together in one bottom corner */
 .tog.side-only, .mbtn.side-only { display: none; }
 @media (orientation: landscape) and (max-height: 640px) {
-  body { padding-block: 4px; padding-left: max(4px, env(safe-area-inset-left, 0px)); padding-right: max(4px, env(safe-area-inset-right, 0px)); }
+  body { padding-block: 0; padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
   .app { position: relative; flex-direction: row; gap: 0; }
+  canvas { border-radius: 0; box-shadow: none; }
   .controls { display: contents; }
-  .side { position: absolute; right: 10px; bottom: 10px; z-index: 5; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; pointer-events: none; }
-  .app.left .side { right: auto; left: 10px; align-items: flex-start; }
-  .pills { display: flex; flex-direction: column; gap: 4px; align-items: inherit; order: 1; pointer-events: none; }
-  .pills > .tog, .side > .btn { pointer-events: auto; }
-  .side .btn.loop { order: 2; flex: none; width: 66px; height: 66px; border-radius: 50%; font-size: 14px; padding: 0; opacity: 0.92; }
+  .side { position: absolute; right: max(10px, env(safe-area-inset-right, 0px)); bottom: 10px; z-index: 5; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; pointer-events: none; }
+  .app.left .side { right: auto; left: max(10px, env(safe-area-inset-left, 0px)); align-items: flex-start; }
+  .pills { display: flex; flex-direction: column; gap: 4px; align-items: inherit; pointer-events: none; }
+  .pills > .tog, .lrow > * { pointer-events: auto; }
+  .lrow { display: flex; align-items: flex-end; gap: 8px; pointer-events: none; }
+  .app.left .lrow { flex-direction: row-reverse; }
+  .side .btn.loop { flex: none; width: 66px; height: 66px; border-radius: 50%; font-size: 14px; padding: 0; opacity: 0.92; }
+  #btnPause { width: 44px; height: 44px; padding: 0; border-radius: 50%; font-size: 15px; font-weight: 700; letter-spacing: 1px; }
+  #btnPause .pt { display: none; }
+  #btnPause .pi { display: inline; }
   .hint, .rotate { display: none; }
   .controls .tog { order: 0; padding: 4px 10px; font-size: 12px; line-height: 1.2; flex: none; opacity: 0.94; }
   .tog.side-only { display: block; }
+  .tog#togFull[hidden] { display: none; }
   .mbtn.side-only { display: block; }
   body.playing .tog.sys { display: none; }
   .controls .tog.act { background: rgba(20,50,61,0.62); }
@@ -204,15 +212,18 @@ canvas {
   </div>
   <div class="controls">
     <div class="side">
-      <button class="btn loop" id="btnLoop" type="button">LOOP</button>
       <div class="pills">
-        <button class="tog act" id="btnPause" type="button" hidden>Pause</button>
         <button class="tog act" id="togSkip" type="button" hidden>Skip tutorial</button>
         <button class="tog sys" id="togMusic" type="button" aria-pressed="true">Music</button>
         <button class="tog sys" id="togSound" type="button" aria-pressed="true">Sound</button>
         <button class="tog sys side-only" id="togSide" type="button">Swap side</button>
         <button class="tog sys" id="togHow" type="button">How to play</button>
         <button class="tog sys" id="togScores" type="button" hidden>High scores</button>
+        <button class="tog sys side-only" id="togFull" type="button" hidden>Full screen</button>
+      </div>
+      <div class="lrow">
+        <button class="tog act" id="btnPause" type="button" aria-label="Pause" hidden><span class="pt">Pause</span><span class="pi" aria-hidden="true">II</span></button>
+        <button class="btn loop" id="btnLoop" type="button">LOOP</button>
       </div>
     </div>
     <div class="hint">Arrows or WASD to fly &middot; your gun fires by itself &middot; Shift to loop (no hits mid-loop) &middot; P to pause</div>
@@ -236,7 +247,7 @@ canvas {
     const bw = stage.clientWidth, bh = stage.clientHeight;
     if (bw < 10 || bh < 10) return;
     const aspect = bw / bh;
-    if (aspect >= 560 / 450 * 1.14) { H = 450; W = Math.round(clamp(H * aspect, 640, 960)); }
+    if (aspect >= 560 / 450 * 1.14) { H = 450; W = Math.round(clamp(H * aspect, 640, 1100)); }
     else if (aspect >= 0.9) { W = 560; H = Math.round(clamp(W / aspect, 450, 620)); }
     else { W = 480; H = Math.round(clamp(W / aspect, 600, 800)); }
     const s = Math.min(bw / W, bh / H);
@@ -570,9 +581,24 @@ canvas {
     loopLeft = baseLeft !== flipSide;
     appEl.classList.toggle('left', loopLeft);
   }
-  const hudShift = () => (loopLeft && overlayMQ && overlayMQ.matches) ? 86 : 0;
+  const hudShift = () => (loopLeft && overlayMQ && overlayMQ.matches) ? 142 : 0;
   function swapSide() { flipSide = !flipSide; try { localStorage.setItem('aw_flip', flipSide ? '1' : '0'); } catch (e) {} applySide(); }
   $('togSide').addEventListener('click', swapSide); $('mSide').addEventListener('click', swapSide);
+  const togFull = $('togFull'), fsEl = document.documentElement;
+  const canFull = !!(fsEl.requestFullscreen || fsEl.webkitRequestFullscreen);
+  function syncFull() { const on = !!(document.fullscreenElement || document.webkitFullscreenElement); togFull.textContent = on ? 'Exit full screen' : 'Full screen'; togFull.hidden = !canFull; }
+  togFull.addEventListener('click', () => {
+    try {
+      if (document.fullscreenElement || document.webkitFullscreenElement) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); }
+      else {
+        const r = (fsEl.requestFullscreen || fsEl.webkitRequestFullscreen).call(fsEl);
+        const lock = () => { try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {}); } catch (e) {} };
+        if (r && r.then) r.then(lock).catch(() => {}); else lock();
+      }
+    } catch (e) {}
+  });
+  document.addEventListener('fullscreenchange', syncFull); document.addEventListener('webkitfullscreenchange', syncFull);
+  syncFull();
   applySide(); syncToggles();
   try { if (screen.orientation && screen.orientation.addEventListener) screen.orientation.addEventListener('change', applySide); } catch (e) {}
   addEventListener('orientationchange', applySide); addEventListener('resize', applySide);

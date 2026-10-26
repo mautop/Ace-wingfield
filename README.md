@@ -14,7 +14,7 @@ Play it: https://YOUR-USERNAME.github.io/ace-wingfield/
 | Pause | P or Esc | Pause button |
 | Pick your plane color | Left and right arrows on the title screen | Tap a color on the title screen |
 
-Turn a phone sideways for a bigger playfield. LOOP floats over a bottom corner, and it moves to the other side when you rotate the phone the other way, so it suits left and right thumbs. You can also use Swap side (title screen) or Swap LOOP side (pause menu). Each sky has its own music. To keep it on your phone's home screen, use your browser's "Add to Home Screen".
+Turn a phone sideways for a bigger playfield. Pause and LOOP float together over a bottom corner (there is also a Full screen button on the title screen), and it moves to the other side when you rotate the phone the other way, so it suits left and right thumbs. You can also use Swap side (title screen) or Swap LOOP side (pause menu). Each sky has its own music. To keep it on your phone's home screen, use your browser's "Add to Home Screen".
 
 ## Ranks
 
