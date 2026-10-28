@@ -182,7 +182,7 @@ canvas {
           <button class="mbtn" id="mSkip" type="button" hidden>Skip tutorial</button>
           <button class="mbtn" id="mMusic" type="button">Music: on</button>
           <button class="mbtn" id="mSound" type="button">Sound: on</button>
-          <button class="mbtn side-only" id="mSide" type="button">Swap LOOP side</button>
+          <button class="mbtn" id="mSide" type="button">Swap button side</button>
           <button class="mbtn" id="mQuit" type="button">Quit to title</button>
         </div>
         <p class="small note">P or Esc also pauses.</p>
@@ -216,15 +216,11 @@ canvas {
         <button class="tog act" id="togSkip" type="button" hidden>Skip tutorial</button>
         <button class="tog sys" id="togMusic" type="button" aria-pressed="true">Music</button>
         <button class="tog sys" id="togSound" type="button" aria-pressed="true">Sound</button>
-        <button class="tog sys side-only" id="togSide" type="button">Swap side</button>
+        <button class="tog sys" id="togSide" type="button">Swap side</button>
         <button class="tog sys" id="togTier" type="button" hidden>Tier</button>
         <button class="tog sys" id="togHow" type="button">How to play</button>
         <button class="tog sys" id="togScores" type="button" hidden>High scores</button>
         <button class="tog sys side-only" id="togFull" type="button" hidden>Full screen</button>
-      </div>
-      <div class="lrow">
-        <button class="tog act" id="btnPause" type="button" aria-label="Pause" hidden><span class="pt">Pause</span><span class="pi" aria-hidden="true">II</span></button>
-        <button class="btn loop" id="btnLoop" type="button">LOOP</button>
       </div>
     </div>
     <div class="hint">Arrows or WASD to fly &middot; your gun fires by itself &middot; Shift to loop (no hits mid-loop) &middot; 1-4 to use power-ups &middot; P to pause</div>
@@ -419,13 +415,15 @@ canvas {
   let curRank = 0, bestRank = 0, wonT = 0, fwT = 0, overT = 0;
   /* bonus rounds: Balloon Rally after the first boss and at each ace title */
   let bonus = null, bonusQueued = false, bonusWait = 0, bl = [];
-  const BONUS_T = 15, BONUS_TIERS = [6, 12, 18];
+  const BONUS_T = 15, BONUS_TIERS = [6, 12, 18], BONUS_INTRO = 2.6;
   const BL_COL = ['#e85d4a', '#f2b632', '#63c9ba', '#a47fcb', '#ff7aa8', '#6ec6ff'];
   function queueBonus(wait) { bonusQueued = true; bonusWait = wait; }
   function startBonus() {
-    bonusQueued = false; en = []; eb = []; bullets = []; bl = [];
-    bonus = { phase: 'run', t: BONUS_T, spawnT: 0.4, caught: 0, gold: 0, resT: 0, text: [] };
-    P.inv = Math.max(P.inv, 3); setMusic('title'); sfx('step'); stageMsg = { text: 'BONUS ROUND!', t: 2.5 };
+    bonusQueued = false;
+    for (const e of en) if (e.hp > 0 && e.x < W + 20) explode(e.x, e.y, 8, false);   /* the fight pops away instead of just vanishing */
+    en = []; eb = []; bullets = []; bl = []; flashW = 0.3;
+    bonus = { phase: 'intro', it: 0, rt: 0, t: BONUS_T, spawnT: 0.4, caught: 0, gold: 0, resT: 0, resTot: 0, text: [] };
+    P.inv = Math.max(P.inv, BONUS_INTRO + 3); setMusic('title'); sfx('pick'); sfx('step');
   }
   function spawnBalloons() {
     const pat = Math.floor(rnd(0, 4)), n = pat === 3 ? 3 : 5, cy = rnd(90, H - 90), x0 = W + 30, goldAt = Math.random() < 0.6 ? Math.floor(rnd(0, n)) : -1;
@@ -446,9 +444,11 @@ canvas {
       if (!tx.length) tx.push('no reward this time');
       sfx('pick');
     } else tx.push('skipped');
-    bonus.phase = 'result'; bonus.resT = reward ? 3 : 0.7; bonus.text = tx; bl = [];
+    bonus.phase = 'result'; bonus.resT = bonus.resTot = reward ? 3 : 0.7; bonus.text = tx; bl = [];
   }
   function updBonus(dt) {
+    if (bonus.phase === 'intro') { bonus.it += dt; if (bonus.it >= BONUS_INTRO) bonus.phase = 'run'; return; }
+    bonus.rt += dt;
     if (bonus.phase === 'result') {
       bonus.resT -= dt;
       if (bonus.resT <= 0) { bonus = null; spawnT = 1.6; setMusic('play'); }
@@ -489,6 +489,18 @@ canvas {
     diver:  { body: '#d9482b', light: '#f07a52', wing: '#f1b9a0', dark: '#4a1a10', stripe: '#f6ead0' },
     baron:  { body: '#b3262b', light: '#e0575a', wing: '#e8c9a0', dark: '#2a0d10', stripe: '#14323d' }
   };
+  /* bosses keep their colors in tier 1; tier 2 (ice) and tier 3 (desert) get darker, meaner palettes */
+  const BARON_PAL = [PAL.baron,
+    { body: '#2b2f5a', light: '#4e5694', wing: '#5d6798', dark: '#0b0d22', stripe: '#8fe0ff' },
+    { body: '#1d1517', light: '#4a3436', wing: '#6b5a52', dark: '#070405', stripe: '#d6a23a' }];
+  const BOSS_RECOLOR = [null, {
+    '#a63a2c': '#241c4a', '#f2d49a': '#8fe0ff', '#e85d4a': '#3a2f6b', '#f6ead0': '#7fc4e8',
+    '#5f7480': '#2a3440', '#7d909c': '#3b4856', '#a9b8c2': '#5b6b7a', '#3d4a52': '#1a2229', '#c25b3c': '#4a2438', '#4b5d68': '#252f38', '#2f3e47': '#10161b'
+  }, {
+    '#a63a2c': '#14090a', '#f2d49a': '#ffb43a', '#e85d4a': '#2a1b1b', '#f6ead0': '#b3202a',
+    '#5f7480': '#2a2423', '#7d909c': '#403836', '#a9b8c2': '#6a5e57', '#3d4a52': '#171212', '#c25b3c': '#5a1418', '#4b5d68': '#2e2726', '#2f3e47': '#120e0e'
+  }];
+  const bc = h => { const m = BOSS_RECOLOR[tier]; return (m && m[h]) || h; };
   const SKINS = [
     { name: 'Teal',      body: '#2a9d8f', light: '#63c9ba', wing: '#f6ead0', dark: '#14323d', stripe: '#f2b632' },
     { name: 'Sunshine',  body: '#f2b632', light: '#ffd873', wing: '#fff3d0', dark: '#5a3d0a', stripe: '#14323d' },
@@ -528,12 +540,11 @@ canvas {
   }
 
   /* ---------- buttons and UI state ---------- */
-  const btnPause = $('btnPause'), togHow = $('togHow'), togScores = $('togScores'), togSkip = $('togSkip'), togMusic = $('togMusic'), togSound = $('togSound');
+  const togHow = $('togHow'), togScores = $('togScores'), togSkip = $('togSkip'), togMusic = $('togMusic'), togSound = $('togSound');
   const ovPause = $('ovPause');
   function updUI() {
     document.body.classList.toggle('playing', state === 'play');
     if (typeof togTier !== 'undefined') { togTier.hidden = medals === 0 || state === 'play'; togTier.textContent = 'Tier ' + (startTier + 1) + ': ' + TIER_NAMES[startTier].replace('THE ', '').toLowerCase().replace(/^./, c => c.toUpperCase()); }
-    btnPause.hidden = state !== 'play';
     togHow.hidden = state === 'play';
     togScores.hidden = state === 'play' || !hs.db;
     togSkip.hidden = !(state === 'play' && tut);
@@ -592,7 +603,7 @@ canvas {
   const flipMusic = () => { musicOn = !musicOn; syncToggles(); initAudio(); mReset = true; };
   togSound.addEventListener('click', flipSound); mSoundB.addEventListener('click', flipSound);
   togMusic.addEventListener('click', flipMusic); mMusicB.addEventListener('click', flipMusic);
-  /* LOOP sits on the thumb side: rotate the phone the other way and it moves to the other side */
+  /* the button column sits on the thumb side: rotate the phone the other way and it moves to the other side */
   const appEl = document.querySelector('.app'), overlayMQ = window.matchMedia ? window.matchMedia('(orientation: landscape) and (max-height: 640px)') : null;
   let flipSide = false, loopLeft = false;
   try { flipSide = localStorage.getItem('aw_flip') === '1'; } catch (e) {}
@@ -603,7 +614,7 @@ canvas {
     loopLeft = baseLeft !== flipSide;
     appEl.classList.toggle('left', loopLeft);
   }
-  const hudShift = () => (loopLeft && overlayMQ && overlayMQ.matches) ? 142 : 0;
+  const hudShift = () => loopLeft ? 2 * colGeom().R + 38 : 0;   /* keep the bottom timer bars clear of the button column */
   function swapSide() { flipSide = !flipSide; try { localStorage.setItem('aw_flip', flipSide ? '1' : '0'); } catch (e) {} applySide(); }
   $('togSide').addEventListener('click', swapSide); $('mSide').addEventListener('click', swapSide);
   const togTier = $('togTier');
@@ -626,7 +637,6 @@ canvas {
   applySide(); syncToggles();
   try { if (screen.orientation && screen.orientation.addEventListener) screen.orientation.addEventListener('change', applySide); } catch (e) {}
   addEventListener('orientationchange', applySide); addEventListener('resize', applySide);
-  btnPause.addEventListener('click', () => setPause(true));
   togHow.addEventListener('click', () => { initAudio(); reset(true); });
   function skipTut() { if (tut) endTut(); }
   togSkip.addEventListener('click', skipTut);
@@ -671,16 +681,13 @@ canvas {
     if (state === 'title' && !modalOpen() && pickSkinAt(posOf(e))) return;
     if (state === 'over' && !modalOpen()) { overTap(posOf(e)); return; }
     if (bonus && bonus.phase === 'run' && state === 'play' && !paused) { const q = posOf(e), r = skipRect(); if (q.x >= r.x && q.x <= r.x + r.w && q.y >= r.y && q.y <= r.y + r.h) { endBonus(false); return; } }
-    if (state === 'play' && !paused) { const ii = itemAt(posOf(e)); if (ii >= 0) { btnPid = e.pointerId; useItem(ii); return; } }
+    if (state === 'play' && !paused) { const c = ctlAt(posOf(e)); if (c) { btnPid = e.pointerId; if (c.t === 'item') useItem(c.i); else if (c.t === 'loop') doLoop(); else setPause(true); return; } }
     if (state !== 'play') begin();
     ptr = posOf(e); offX = P.x - ptr.x; offY = P.y - ptr.y;
   });
   cv.addEventListener('pointermove', e => { if (ptr && e.pointerId !== btnPid) ptr = posOf(e); });
   ['pointerup', 'pointercancel'].forEach(n => cv.addEventListener(n, e => { if (e.pointerId === btnPid) { btnPid = -1; return; } ptr = null; }));
 
-  const bL = $('btnLoop');
-  bL.addEventListener('pointerdown', e => { e.preventDefault(); initAudio(); if (state !== 'play') begin(); else doLoop(); });
-  bL.addEventListener('contextmenu', e => e.preventDefault());
 
   /* ---------- particles ---------- */
   function puff(x, y, col, r, life, vx, vy) { pt.push({ x, y, vx: vx || 0, vy: vy || 0, life, max: life, r, col, kind: 'puff' }); }
@@ -1208,13 +1215,13 @@ canvas {
   function drawGasbag() {
     const b = boss;
     ctx.save(); ctx.translate(b.x, b.y);
-    polyO([[70, -24], [100, -52], [106, -20]], '#a63a2c', 2.5); polyO([[70, 24], [100, 52], [106, 20]], '#a63a2c', 2.5);
+    polyO([[70, -24], [100, -52], [106, -20]], bc('#a63a2c'), 2.5); polyO([[70, 24], [100, 52], [106, 20]], bc('#a63a2c'), 2.5);
     ctx.beginPath(); ctx.roundRect(-30, 34, 60, 18, 5); ctx.fillStyle = INK; ctx.fill();
-    for (let i = 0; i < 4; i++) rr(-22 + i * 13, 39, 8, 7, 2, '#f2d49a');
+    for (let i = 0; i < 4; i++) rr(-22 + i * 13, 39, 8, 7, 2, bc('#f2d49a'));
     ctx.strokeStyle = INK; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(-16, 30); ctx.lineTo(-16, 36); ctx.moveTo(16, 30); ctx.lineTo(16, 36); ctx.stroke();
-    ctx.save(); ctx.beginPath(); ctx.ellipse(0, 0, 100, 40, 0, 0, 7); ctx.fillStyle = b.flash > 0 ? '#ffffff' : '#e85d4a'; ctx.fill(); ctx.clip();
+    ctx.save(); ctx.beginPath(); ctx.ellipse(0, 0, 100, 40, 0, 0, 7); ctx.fillStyle = b.flash > 0 ? '#ffffff' : bc('#e85d4a'); ctx.fill(); ctx.clip();
     if (b.flash <= 0) {
-      ctx.fillStyle = '#f6ead0'; for (let i = -1; i < 5; i++) ctx.fillRect(-60 + i * 36, -44, 14, 88);
+      ctx.fillStyle = bc('#f6ead0'); for (let i = -1; i < 5; i++) ctx.fillRect(-60 + i * 36, -44, 14, 88);
       ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.fillRect(-100, -42, 200, 14);
       ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(-100, 14, 200, 30);
     }
@@ -1242,7 +1249,7 @@ canvas {
     if (b.s === 'charge') {
       for (let i = 0; i < 5; i++) { ctx.fillStyle = 'rgba(255,255,255,' + (0.4 - i * 0.07) + ')'; ctx.fillRect(b.x + 80 + i * 30, b.y - 26 + i * 12, 46, 3); }
     }
-    plane(b.x + sx, b.y + sy, 0, PAL.baron, { f: -1, s: 1.7, pilot: 'hawk', tri: true });
+    plane(b.x + sx, b.y + sy, 0, BARON_PAL[tier], { f: -1, s: 1.7, pilot: 'hawk', tri: true });
     if (b.flash > 0) { ctx.globalAlpha = 0.6; ell(b.x, b.y + b.oy, b.rx, b.ry, '#fff'); ctx.globalAlpha = 1; }
   }
 
@@ -1252,32 +1259,32 @@ canvas {
     const pw = Math.abs(Math.cos(T * 38));
     ell(118, -6, 3, 5 + 14 * pw, 'rgba(20,50,61,0.5)'); ell(118, 18, 3, 5 + 14 * pw, 'rgba(20,50,61,0.5)');
     circ(116, -6, 3.2, INK); circ(116, 18, 3.2, INK);
-    polyO([[84, -8], [108, -40], [116, -34], [106, -4]], '#5f7480', 2.4);
-    polyO([[-114, -6], [-136, 10], [-100, 22]], '#5f7480', 2.4);
+    polyO([[84, -8], [108, -40], [116, -34], [106, -4]], bc('#5f7480'), 2.4);
+    polyO([[-114, -6], [-136, 10], [-100, 22]], bc('#5f7480'), 2.4);
     // hull
     ctx.beginPath(); ctx.moveTo(-116, -4); ctx.lineTo(-98, 22); ctx.quadraticCurveTo(-60, 38, 0, 38); ctx.lineTo(86, 36); ctx.lineTo(108, 12); ctx.lineTo(108, -10); ctx.closePath();
-    ctx.fillStyle = b.flash > 0 ? '#ffffff' : '#7d909c'; ctx.fill();
+    ctx.fillStyle = b.flash > 0 ? '#ffffff' : bc('#7d909c'); ctx.fill();
     if (b.flash <= 0) {
       ctx.save(); ctx.clip();
       ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.fillRect(-120, -12, 240, 12);
       ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fillRect(-120, 22, 240, 24);
-      ctx.fillStyle = '#e85d4a'; ctx.fillRect(-120, 8, 240, 5);
+      ctx.fillStyle = [bc('#e85d4a'), '#8fe0ff', '#c42a2a'][tier]; ctx.fillRect(-120, 8, 240, 5);
       ctx.restore();
     }
     ctx.lineWidth = 3; ctx.strokeStyle = INK; ctx.stroke();
-    if (b.flash <= 0) for (let x = -64; x <= 80; x += 24) { circ(x, 27, 4.4, '#f6ead0'); ctx.beginPath(); ctx.arc(x, 27, 4.4, 0, 7); ctx.lineWidth = 1.8; ctx.stroke(); }
+    if (b.flash <= 0) for (let x = -64; x <= 80; x += 24) { circ(x, 27, 4.4, [bc('#f6ead0'), '#9aa8b4', '#b8892e'][tier]); ctx.beginPath(); ctx.arc(x, 27, 4.4, 0, 7); ctx.lineWidth = 1.8; ctx.stroke(); }
     // deck, cabin, funnel
-    ctx.beginPath(); ctx.roundRect(-100, -16, 198, 12, 3); ctx.fillStyle = '#a9b8c2'; ctx.fill(); ctx.lineWidth = 2; ctx.stroke();
-    ctx.beginPath(); ctx.roundRect(30, -72, 16, 28, 3); ctx.fillStyle = '#3d4a52'; ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.roundRect(-100, -16, 198, 12, 3); ctx.fillStyle = bc('#a9b8c2'); ctx.fill(); ctx.lineWidth = 2; ctx.stroke();
+    ctx.beginPath(); ctx.roundRect(30, -72, 16, 28, 3); ctx.fillStyle = bc('#3d4a52'); ctx.fill(); ctx.stroke();
     for (let i = 0; i < 3; i++) { const sp = (T * 30 + i * 14) % 42; circ(38 + sp * 0.5, -76 - sp, 5 + sp * 0.12, 'rgba(60,60,70,' + (0.5 - sp / 90) + ')'); }
-    ctx.beginPath(); ctx.roundRect(-26, -46, 68, 30, 5); ctx.fillStyle = '#c25b3c'; ctx.fill(); ctx.lineWidth = 2.4; ctx.stroke();
-    for (let i = 0; i < 3; i++) rr(-18 + i * 20, -38, 13, 11, 3, '#f2d49a', INK);
+    ctx.beginPath(); ctx.roundRect(-26, -46, 68, 30, 5); ctx.fillStyle = bc('#c25b3c'); ctx.fill(); ctx.lineWidth = 2.4; ctx.stroke();
+    for (let i = 0; i < 3; i++) rr(-18 + i * 20, -38, 13, 11, 3, bc('#f2d49a'), INK);
     // turrets track the player
     for (const tx of [-70, 62]) {
       const ty = -20, a = Math.atan2(P.y - (b.y + ty), P.x - (b.x + tx));
-      circ(tx, ty, 11, '#4b5d68'); ctx.beginPath(); ctx.arc(tx, ty, 11, 0, 7); ctx.lineWidth = 2.2; ctx.stroke();
+      circ(tx, ty, 11, bc('#4b5d68')); ctx.beginPath(); ctx.arc(tx, ty, 11, 0, 7); ctx.lineWidth = 2.2; ctx.stroke();
       ctx.save(); ctx.translate(tx, ty); ctx.rotate(a); ctx.beginPath(); ctx.roundRect(0, -3.5, 26, 7, 3); ctx.fillStyle = INK; ctx.fill(); ctx.restore();
-      circ(tx, ty, 5.5, '#2f3e47');
+      circ(tx, ty, 5.5, bc('#2f3e47'));
     }
     ctx.restore();
   }
@@ -1299,22 +1306,43 @@ canvas {
     ctx.beginPath(); ctx.ellipse(b.x - 5, y - 7, 3.4, 6, -0.4, 0, 7); ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.fill();
     if (g) txt('★', b.x, y + 6, 17, '#a63a2c', 'center');
   }
+  const easeOutBack = x => { const c1 = 1.9, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
   function drawBonus() {
-    if (bonus.phase === 'run') {
-      const w = Math.min(300, W - 260), x = W / 2 - w / 2;
+    if (bonus.phase === 'intro') {
+      const t = bonus.it, inn = clamp(t / 0.55, 0, 1), out = clamp((BONUS_INTRO - t) / 0.45, 0, 1);
+      ctx.fillStyle = 'rgba(20,50,61,' + (0.3 * clamp(t / 0.4, 0, 1) * out) + ')'; ctx.fillRect(0, 0, W, H);
+      const w = Math.min(460, W - 200), h = 118, x = W / 2 - w / 2, y = H * 0.26;
+      const slide = (1 - easeOutBack(inn)) * -W * 0.7 + (1 - out) * W * 0.7;
+      ctx.save(); ctx.translate(slide, 0);
+      panel(x, y, w, h, 16, 'rgba(246,234,208,0.96)');
+      txt('BONUS ROUND!', W / 2, y + 40, Math.min(38, w / 11), '#a63a2c', 'center');
+      txt('Fly through the balloons. Gold ones count double.', W / 2, y + 66, 14, INK, 'center', null, BODY_FONT);
+      const prizes = [['heart', BONUS_TIERS[0], '+1 heart'], ['shield', BONUS_TIERS[1], 'shield'], ['star', BONUS_TIERS[2], 'rapid + spread']];
+      prizes.forEach((pz, i) => {
+        const px = W / 2 + (i - 1) * Math.min(130, w / 3.2), py = y + 96, bob = Math.sin(T * 4 + i) * 1.5;
+        circ(px - 38, py + bob, 11, INK); circ(px - 38, py + bob, 9.5, PK_COL[pz[0]]); pkIcon(pz[0], px - 38, py + bob);
+        txt(pz[1] + '  ' + pz[2], px - 22, py + 5 + bob, 12, INK, 'left');
+      });
+      ctx.restore();
+    } else if (bonus.phase === 'run') {
+      const w = Math.min(300, W - 260), x = W / 2 - w / 2, dy = -64 * (1 - easeOutBack(clamp(bonus.rt / 0.5, 0, 1)));
+      ctx.save(); ctx.translate(0, dy);
       panel(x, 8, w, 46, 12, 'rgba(246,234,208,0.92)');
       txt('BONUS ROUND', W / 2, 26, 14, '#a63a2c', 'center');
       rr(x + 14, 34, w - 28, 8, 4, 'rgba(20,50,61,0.18)');
       rr(x + 14, 34, (w - 28) * clamp(bonus.t / BONUS_T, 0, 1), 8, 4, '#f2b632');
       const c = bonus.caught, nxt = BONUS_TIERS.find(t => c < t);
       txt('CAUGHT ' + c + (nxt ? '   NEXT REWARD AT ' + nxt : '   ALL REWARDS EARNED'), W / 2, 76, 14, '#f6ead0', 'center', INK);
-      const r = skipRect(); panel(r.x, r.y, r.w, r.h, 12, 'rgba(20,50,61,0.7)');
-      txt('SKIP', r.x + r.w / 2, r.y + 20, 13, '#f6ead0', 'center');
+      ctx.restore();
+      const r = skipRect(); ctx.globalAlpha = clamp(bonus.rt / 0.6, 0, 1); panel(r.x, r.y, r.w, r.h, 12, 'rgba(20,50,61,0.7)');
+      txt('SKIP', r.x + r.w / 2, r.y + 20, 13, '#f6ead0', 'center'); ctx.globalAlpha = 1;
     } else {
-      const sz = Math.min(38, W / 16);
-      txt('BONUS COMPLETE', W / 2, H * 0.3, sz, '#f2b632', 'center', INK);
-      txt(bonus.caught + ' caught', W / 2, H * 0.3 + 34, 20, '#f6ead0', 'center', INK);
-      txt(bonus.text.join('  ·  '), W / 2, H * 0.3 + 64, 17, '#f6ead0', 'center', INK, BODY_FONT);
+      const el = bonus.resTot - bonus.resT, a = Math.min(clamp(el / 0.25, 0, 1), clamp(bonus.resT / 0.5, 0, 1)), sz = Math.min(38, W / 16);
+      ctx.globalAlpha = a; const rise = (1 - clamp(el / 0.3, 0, 1)) * 14;
+      txt('BONUS COMPLETE', W / 2, H * 0.3 + rise, sz, '#f2b632', 'center', INK);
+      txt(bonus.caught + ' caught', W / 2, H * 0.3 + 34 + rise, 20, '#f6ead0', 'center', INK);
+      txt(bonus.text.join('  ·  '), W / 2, H * 0.3 + 64 + rise, 17, '#f6ead0', 'center', INK, BODY_FONT);
+      ctx.globalAlpha = 1;
     }
   }
   function pkIcon(kind, x, y) {
@@ -1509,27 +1537,51 @@ canvas {
 
   /* ---------- HUD and overlays ---------- */
   const FINE = !!(window.matchMedia && matchMedia('(pointer: fine)').matches);
-  function itemPos(i) {   /* a column on the side away from LOOP */
-    const y0 = Math.max(86, H / 2 - 74), st = Math.min(50, (H - 80 - y0) / 3);
-    return { x: loopLeft ? W - 32 : 32, y: y0 + i * st };
+  /* one column of round buttons on the thumb side: power-ups on top, LOOP big at the bottom; Pause is a small button in the sky */
+  const SLOT = [3, 0, 1, 2];   /* bomb sits farthest from LOOP, so a panicked tap cannot set it off */
+  function colGeom() {
+    const R = clamp(H * 0.09, 26, 36), rI = H >= 360 ? 21 : 18;
+    return { R, rI, x: loopLeft ? 16 + R : W - 16 - R, yL: H - 14 - R, step: 2 * rI + 7, c3: H - 14 - R - R - rI - 8 };
   }
-  function itemAt(q) { for (let i = 0; i < 4; i++) { const p = itemPos(i); if (Math.hypot(q.x - p.x, q.y - p.y) < 28) return i; } return -1; }
+  function itemPos(i) { const g = colGeom(); return { x: g.x, y: g.c3 - (3 - SLOT.indexOf(i)) * g.step }; }
+  const pausePos = () => ({ x: W - 142, y: 31, r: 18 });
+  function ctlAt(q) {
+    const g = colGeom();
+    if (Math.hypot(q.x - g.x, q.y - g.yL) < g.R + 10) return { t: 'loop' };
+    for (let i = 0; i < 4; i++) { const p = itemPos(i); if (Math.hypot(q.x - p.x, q.y - p.y) < g.rI + 7) return { t: 'item', i }; }
+    const pp = pausePos(); if (Math.hypot(q.x - pp.x, q.y - pp.y) < pp.r + 9) return { t: 'pause' };
+    return null;
+  }
   function drawItems() {
     if (state !== 'play') return;
+    const g = colGeom();
     for (let i = 0; i < 4; i++) {
-      const it = ITEMS[i], p = itemPos(i), n = inv[it.k], on = it.k !== 'bomb' && P[it.k] > 0, dim = bonus ? 0.35 : 1;
+      const it = ITEMS[i], p = itemPos(i), n = inv[it.k], on = it.k !== 'bomb' && P[it.k] > 0, dim = bonus ? 0.35 : 1, ri = g.rI;
       itemFlash[i] = Math.max(0, itemFlash[i] - 1 / 60);
       ctx.globalAlpha = dim * (n > 0 || on ? 1 : 0.45);
       const sh = itemFlash[i] > 0 ? Math.sin(itemFlash[i] * 90) * 3 : 0;
-      circ(p.x + sh, p.y, 24, INK); circ(p.x + sh, p.y, 21.5, n > 0 || on ? it.col : 'rgba(246,234,208,0.8)');
-      circ(p.x + sh - 6, p.y - 8, 5, 'rgba(255,255,255,0.35)');
+      circ(p.x + sh, p.y, ri + 2.5, INK); circ(p.x + sh, p.y, ri, n > 0 || on ? it.col : 'rgba(246,234,208,0.8)');
+      circ(p.x + sh - ri * 0.28, p.y - ri * 0.38, ri * 0.24, 'rgba(255,255,255,0.35)');
       pkIcon(it.kind, p.x + sh, p.y);
-      if (on) { const max = it.k === 'rapid' ? 8 : it.k === 'spread' ? 9 : 12; ctx.strokeStyle = '#fff'; ctx.lineWidth = 3.5; ctx.beginPath(); ctx.arc(p.x, p.y, 26, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * clamp(P[it.k] / max, 0, 1)); ctx.stroke(); }
-      circ(p.x + 15, p.y + 15, 9, INK); circ(p.x + 15, p.y + 15, 7.5, '#f6ead0');
-      txt(String(n), p.x + 15, p.y + 19.5, 12, INK, 'center');
-      if (FINE) txt(it.key, p.x - 17, p.y - 12, 11, '#f6ead0', 'center', INK);
+      if (on) { const max = it.k === 'rapid' ? 8 : it.k === 'spread' ? 9 : 12; ctx.strokeStyle = '#fff'; ctx.lineWidth = 3.5; ctx.beginPath(); ctx.arc(p.x, p.y, ri + 5, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * clamp(P[it.k] / max, 0, 1)); ctx.stroke(); }
+      circ(p.x + ri * 0.7, p.y + ri * 0.7, 9, INK); circ(p.x + ri * 0.7, p.y + ri * 0.7, 7.5, '#f6ead0');
+      txt(String(n), p.x + ri * 0.7, p.y + ri * 0.7 + 4.5, 12, INK, 'center');
+      if (FINE) txt(it.key, p.x - ri * 0.8, p.y - ri * 0.55, 11, '#f6ead0', 'center', INK);
       ctx.globalAlpha = 1;
     }
+    /* LOOP */
+    const ready = P.loopCd <= 0 && P.loop <= 0, lm = clamp(1 - P.loopCd / LOOP_CD, 0, 1);
+    ctx.globalAlpha = 0.95;
+    circ(g.x, g.yL + 4, g.R + 3, 'rgba(0,0,0,0.22)'); circ(g.x, g.yL, g.R + 3, INK);
+    circ(g.x, g.yL, g.R, ready ? '#f2b632' : P.loop > 0 ? '#fff0b8' : '#b99a52');
+    circ(g.x - g.R * 0.3, g.yL - g.R * 0.38, g.R * 0.2, 'rgba(255,255,255,0.4)');
+    if (!ready && P.loop <= 0) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.beginPath(); ctx.arc(g.x, g.yL, g.R - 5, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * lm); ctx.stroke(); }
+    txt('LOOP', g.x, g.yL + g.R * 0.14, Math.round(g.R * 0.42), INK, 'center');
+    /* Pause */
+    const pp = pausePos();
+    circ(pp.x, pp.y, pp.r + 2.5, INK); circ(pp.x, pp.y, pp.r, 'rgba(246,234,208,0.92)');
+    rr(pp.x - 6, pp.y - 7, 4.5, 14, 1.5, INK); rr(pp.x + 1.5, pp.y - 7, 4.5, 14, 1.5, INK);
+    ctx.globalAlpha = 1;
   }
   function drawHUD() {
     const n = Math.max(3, P.hp), pw = 22 + n * 24;
@@ -1541,12 +1593,7 @@ canvas {
     txt('BEST ' + best, W - 63, 44, 11, '#a63a2c', 'center');
     if (curRank > 0) txt(RANKS[curRank], W - 63, 68, 13, '#f2b632', 'center', INK);
     if (tier > 0) txt('TIER ' + (tier + 1), W - 63, curRank > 0 ? 86 : 68, 12, '#f6ead0', 'center', INK);
-    const lm = 1 - P.loopCd / LOOP_CD;
-    const hx = hudShift();
-    panel(10 + hx, H - 34, 128, 24, 12, 'rgba(246,234,208,0.9)');
-    rr(18 + hx, H - 26, 60, 8, 4, 'rgba(20,50,61,0.2)'); rr(18 + hx, H - 26, 60 * lm, 8, 4, lm >= 1 ? '#e0a010' : '#6aa8a0');
-    txt('LOOP', 84 + hx, H - 18, 11, INK, 'left');
-    let mx = 146 + hx;
+    let mx = 10 + hudShift();
     for (const [label, val, max, col] of [['RAPID', P.rapid, 8, '#e85d4a'], ['SPREAD', P.spread, 9, '#a47fcb'], ['SHIELD', P.shield, 12, '#4aa8e8']]) {
       if (val <= 0) continue;
       panel(mx, H - 34, 138, 24, 12, 'rgba(246,234,208,0.9)');
@@ -1580,7 +1627,7 @@ canvas {
     let body = '';
     if (s === 0) body = COARSE ? 'Drag on the sky to fly around' : 'Use arrow keys or WASD to fly around';
     else if (s === 1) body = 'Your gun fires by itself. Shoot down 2 targets (' + Math.min(2, tut.tkills) + '/2)';
-    else if (s === 2) body = (COARSE ? 'Tap LOOP' : 'Press SHIFT') + ' to loop the loop. You are safe mid-loop.';
+    else if (s === 2) body = (COARSE ? 'Tap the LOOP button' : 'Press SHIFT') + ' to loop the loop. You are safe mid-loop.';
     else if (s === 3) body = 'Fly into the balloon to store it. Tap its button to use it.';
     else body = 'Later: spread shots, shields, bombs and mines. Go, ace!';
     const w = Math.min(W - 40, 480), x = W / 2 - w / 2, y = 72;

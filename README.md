@@ -10,11 +10,12 @@ Play it: https://YOUR-USERNAME.github.io/ace-wingfield/
 |---|---|---|
 | Fly | Arrow keys or WASD | Drag on the sky |
 | Fire | Automatic | Automatic |
-| Loop (no hits mid-loop) | Shift | LOOP button |
-| Pause | P or Esc | Pause button |
+| Loop (no hits mid-loop) | Shift | The big LOOP button |
+| Use a stored power-up | 1 to 4 | The round buttons above LOOP |
+| Pause | P or Esc | The small pause button at the top |
 | Pick your plane color | Left and right arrows on the title screen | Tap a color on the title screen |
 
-Turn a phone sideways for a bigger playfield. Pause and LOOP float together over a bottom corner (there is also a Full screen button on the title screen), and it moves to the other side when you rotate the phone the other way, so it suits left and right thumbs. You can also use Swap side (title screen) or Swap LOOP side (pause menu). Each sky has its own music. To keep it on your phone's home screen, use your browser's "Add to Home Screen".
+All the touch buttons live inside the sky, in one column on your thumb side: power-ups on top and the big LOOP button at the bottom, with the bomb farthest from LOOP so it is hard to hit by accident. Turn a phone sideways for a bigger playfield (there is also a Full screen button on the title screen). The column moves to the other side when you rotate the phone the other way, so it suits left and right thumbs. You can also use Swap side (title screen) or Swap button side (pause menu). Each sky has its own music. To keep it on your phone's home screen, use your browser's "Add to Home Screen".
 
 ## Ranks
 
@@ -30,7 +31,7 @@ The game has three tiers of 100 waves each. Hearts, score and your plane carry o
 | 2. The Snowfield | Day, polar night, blizzard | Snow | Silver star |
 | 3. The Desert | Day, dusk, sandstorm | Blowing sand | Gold star, and the game ends |
 
-Tiers 2 and 3 are a little harder, and the boss fights get tougher. If you lose in tier 2 or 3 you restart at wave 1 of that tier. Once you own a medal, a **Tier** button on the home screen lets you pick which tier to start in.
+Tiers 2 and 3 are a little harder, and the boss fights get tougher. The bosses also change colors: icy indigo in the snowfield, and black with crimson and gold in the desert. If you lose in tier 2 or 3 you restart at wave 1 of that tier. Once you own a medal, a **Tier** button on the home screen lets you pick which tier to start in.
 
 Plane colors: Teal, Sunshine and Sky Blue are free. The bronze star unlocks Midnight, Bubblegum and Snow. The silver star unlocks Cherry and Graphite. All eight show on the home screen, and locked ones can be previewed but not flown. Medals are saved in your browser.
 
