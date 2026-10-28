@@ -1,6 +1,6 @@
 # Ace Wingfield
 
-A side-scrolling biplane dogfight that runs in the browser. Fly a fox pilot through day, night and storm skies, shoot down six kinds of sky pirate, dodge with a loop, and survive 100 waves to become the Ace of Aces.
+A side-scrolling biplane dogfight that runs in the browser. Fly a fox pilot through day, night and storm skies, shoot down six kinds of sky pirate, dodge with a loop, and survive three tiers of 100 waves to earn the bronze, silver and gold star medals.
 
 Play it: https://YOUR-USERNAME.github.io/ace-wingfield/
 
@@ -18,7 +18,23 @@ Turn a phone sideways for a bigger playfield. Pause and LOOP float together over
 
 ## Ranks
 
-Each wave takes 8 kills. Pass wave 20 for **Ace**, wave 40 for **Double Ace**, wave 60 for **Triple Ace**, and wave 80 for **Quadruple Ace**. Clear all 100 waves to become the **Ace of Aces**, then the game starts over.
+Each wave takes 8 kills. Pass wave 20 for **Ace**, wave 40 for **Double Ace**, wave 60 for **Triple Ace**, and wave 80 for **Quadruple Ace**. Clear all 100 waves to become the **Ace of Aces** and earn the tier's star medal.
+
+## Tiers, medals and plane colors
+
+The game has three tiers of 100 waves each. Hearts, score and your plane carry over.
+
+| Tier | Sky | Weather | Reward for clearing it |
+| --- | --- | --- | --- |
+| 1. The Meadow | Day, night, storm | Rain in the storm | Bronze star |
+| 2. The Snowfield | Day, polar night, blizzard | Snow | Silver star |
+| 3. The Desert | Day, dusk, sandstorm | Blowing sand | Gold star, and the game ends |
+
+Tiers 2 and 3 are a little harder, and the boss fights get tougher. If you lose in tier 2 or 3 you restart at wave 1 of that tier. Once you own a medal, a **Tier** button on the home screen lets you pick which tier to start in.
+
+Plane colors: Teal, Sunshine and Sky Blue are free. The bronze star unlocks Midnight, Bubblegum and Snow. The silver star unlocks Cherry and Graphite. All eight show on the home screen, and locked ones can be previewed but not flown. Medals are saved in your browser.
+
+Testing shortcuts (add to the page address): `?medal=bronze`, `?medal=silver` or `?medal=gold` unlocks the medals, `?tier=2` or `?tier=3` picks the start tier, and `?wave=90` starts a new run at that wave.
 
 ## Bonus rounds
 
@@ -26,7 +42,7 @@ After the first boss, and each time you earn an ace title, a 15-second **Balloon
 
 ## Power-ups
 
-Hearts heal, stars give rapid fire, shields absorb a hit, the spread shot fires three ways, and bombs clear the screen.
+Hearts heal the moment you pick them up. Everything else is stored, up to 2 of each kind, and you choose when to use it: stars give rapid fire, shields absorb a hit, the spread shot fires three ways, and bombs clear the screen. Tap the round buttons on the side away from LOOP, or press 1 to 4 on a keyboard. A full slot turns an extra pickup into 25 points. Stored power-ups reset when you move on to the next tier.
 
 ## Hazards
 
